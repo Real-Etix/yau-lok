@@ -1,0 +1,300 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { DEMO_ROUTE_NAME, DEMO_STOPS } from "@/data/demo-route";
+import { MINIBUS_PHRASES, type Phrase } from "@/data/phrases";
+import { useGeolocation } from "@/hooks/useGeolocation";
+import {
+  useRideTracker,
+  APPROACH_RADIUS_M,
+  type RideState,
+} from "@/hooks/useRideTracker";
+import { lerp, type LatLng } from "@/lib/geo";
+import { listenCantonese, speakCantonese } from "@/lib/speech";
+
+const STATE_LABEL: Record<RideState, { text: string; className: string }> = {
+  riding: { text: "On the way", className: "bg-emerald-100 text-emerald-900" },
+  approaching: {
+    text: "Your stop is coming up — get ready!",
+    className: "bg-amber-200 text-amber-950",
+  },
+  arrive_now: {
+    text: "SHOUT NOW — your stop is here!",
+    className: "bg-red-500 text-white animate-pulse",
+  },
+  arrived: {
+    text: "You made it — 唔該晒 driver!",
+    className: "bg-slate-200 text-slate-800",
+  },
+};
+
+type DriverReply = {
+  transcript: string;
+  english: string;
+  reply_cantonese: string;
+  reply_english: string;
+};
+
+// Demo mode drives a simulated position along the stop polyline,
+// so the full journey can be shown indoors at pitch time.
+// Progress is wall-clock based so background-tab timer throttling
+// can't stall the ride mid-demo.
+const SIM_RIDE_DURATION_MS = 60_000;
+
+function useSimulatedRide(active: boolean) {
+  const [progress, setProgress] = useState(0); // 0..1 across whole route
+  const startRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!active) {
+      startRef.current = null;
+      return;
+    }
+    startRef.current ??= Date.now();
+    const id = setInterval(() => {
+      const elapsed = Date.now() - (startRef.current ?? Date.now());
+      setProgress(Math.min(1, elapsed / SIM_RIDE_DURATION_MS));
+    }, 250);
+    return () => clearInterval(id);
+  }, [active]);
+
+  const position: LatLng | null = active
+    ? (() => {
+        const segs = DEMO_STOPS.length - 1;
+        const x = progress * segs;
+        const i = Math.min(Math.floor(x), segs - 1);
+        return lerp(DEMO_STOPS[i], DEMO_STOPS[i + 1], x - i);
+      })()
+    : null;
+
+  return {
+    position,
+    progress,
+    reset: () => {
+      startRef.current = null;
+      setProgress(0);
+    },
+  };
+}
+
+export default function RidePage() {
+  const [demoMode, setDemoMode] = useState(true);
+  const [destinationSeq, setDestinationSeq] = useState<number | null>(5);
+  const [coachMode, setCoachMode] = useState(true);
+  const [speaking, setSpeaking] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
+  const [driverReply, setDriverReply] = useState<DriverReply | null>(null);
+  const [listenError, setListenError] = useState<string | null>(null);
+
+  const sim = useSimulatedRide(demoMode);
+  const gps = useGeolocation(!demoMode);
+  const position = demoMode ? sim.position : gps.position;
+
+  const tracked = useRideTracker(DEMO_STOPS, destinationSeq, position);
+
+  // Latch "arrived": once we've been at the stop and are moving away
+  // again, the ride is over — don't fall back to "coming up".
+  const [reachedStop, setReachedStop] = useState(false);
+  useEffect(() => {
+    if (tracked.state === "arrive_now") setReachedStop(true);
+  }, [tracked.state]);
+  useEffect(() => setReachedStop(false), [destinationSeq, demoMode]);
+  const status =
+    reachedStop && tracked.state !== "arrive_now"
+      ? { ...tracked, state: "arrived" as const }
+      : tracked;
+
+  // Proactive alert: chime once when entering "approaching".
+  const alertedRef = useRef(false);
+  useEffect(() => {
+    if (status.state === "approaching" && !alertedRef.current) {
+      alertedRef.current = true;
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      speakCantonese("就到喇");
+    }
+    if (status.state === "riding") alertedRef.current = false;
+  }, [status.state]);
+
+  const speak = useCallback(async (phrase: Phrase) => {
+    setSpeaking(phrase.id);
+    try {
+      await speakCantonese(phrase.cantonese);
+    } finally {
+      setTimeout(() => setSpeaking(null), 600);
+    }
+  }, []);
+
+  const listenToDriver = useCallback(async () => {
+    setListening(true);
+    setListenError(null);
+    setDriverReply(null);
+    try {
+      const transcript = await listenCantonese();
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "translation failed");
+      setDriverReply({ transcript, ...data });
+    } catch (e) {
+      setListenError(e instanceof Error ? e.message : "Could not listen");
+    } finally {
+      setListening(false);
+    }
+  }, []);
+
+  const label = STATE_LABEL[status.state];
+  const primaryPhrase = MINIBUS_PHRASES.find((p) => p.primary)!;
+  const otherPhrases = MINIBUS_PHRASES.filter((p) => !p.primary);
+
+  return (
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 p-4">
+      <header className="flex items-center justify-between">
+        <Link href="/" className="text-sm text-slate-500">
+          ← Yau Lok!
+        </Link>
+        <div className="flex gap-2 text-xs">
+          <button
+            onClick={() => {
+              setDemoMode((d) => !d);
+              sim.reset();
+            }}
+            className={`rounded-full px-3 py-1 font-medium ${
+              demoMode ? "bg-indigo-600 text-white" : "bg-slate-200"
+            }`}
+          >
+            {demoMode ? "Demo ride" : "Live GPS"}
+          </button>
+          <button
+            onClick={() => setCoachMode((c) => !c)}
+            className={`rounded-full px-3 py-1 font-medium ${
+              coachMode ? "bg-teal-600 text-white" : "bg-slate-200"
+            }`}
+          >
+            Coach
+          </button>
+        </div>
+      </header>
+
+      <section className="rounded-2xl border border-slate-200 p-4">
+        <p className="text-xs uppercase tracking-wide text-slate-500">
+          {DEMO_ROUTE_NAME}
+        </p>
+        <label className="mt-2 block text-sm">
+          Get off at
+          <select
+            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            value={destinationSeq ?? ""}
+            onChange={(e) => setDestinationSeq(Number(e.target.value))}
+          >
+            {DEMO_STOPS.map((s) => (
+              <option key={s.seq} value={s.seq}>
+                {s.name.en} · {s.name.tc}
+              </option>
+            ))}
+          </select>
+        </label>
+        {!demoMode && gps.error && (
+          <p className="mt-2 text-sm text-red-600">GPS: {gps.error}</p>
+        )}
+      </section>
+
+      <section
+        className={`rounded-2xl p-4 text-center font-semibold ${label.className}`}
+      >
+        <p className="text-lg">{label.text}</p>
+        {status.distanceM !== null && (
+          <p className="mt-1 text-sm font-normal">
+            {Math.round(status.distanceM)} m to {status.destination?.name.en}
+            {status.nearestStop && (
+              <> · near {status.nearestStop.name.en}</>
+            )}
+          </p>
+        )}
+        {demoMode && (
+          <p className="mt-1 text-xs font-normal opacity-70">
+            simulated ride · {Math.round(sim.progress * 100)}% of route
+          </p>
+        )}
+      </section>
+
+      <button
+        onClick={() => speak(primaryPhrase)}
+        className={`rounded-3xl p-6 text-center shadow-lg transition active:scale-95 ${
+          status.state === "arrive_now" || status.state === "approaching"
+            ? "bg-red-600 text-white"
+            : "bg-slate-900 text-white"
+        } ${speaking === primaryPhrase.id ? "ring-4 ring-amber-400" : ""}`}
+      >
+        <span className="block text-3xl font-bold">
+          {primaryPhrase.cantonese}
+        </span>
+        {coachMode && (
+          <span className="mt-1 block text-sm opacity-80">
+            {primaryPhrase.jyutping}
+          </span>
+        )}
+        <span className="mt-1 block text-sm opacity-80">
+          {primaryPhrase.english} · tap to speak for me
+        </span>
+      </button>
+
+      <section className="grid grid-cols-2 gap-2">
+        {otherPhrases.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => speak(p)}
+            className={`rounded-xl border border-slate-200 p-3 text-left text-sm transition active:scale-95 ${
+              speaking === p.id ? "ring-2 ring-amber-400" : ""
+            }`}
+          >
+            <span className="block font-semibold">{p.cantonese}</span>
+            {coachMode && (
+              <span className="block text-xs text-slate-500">{p.jyutping}</span>
+            )}
+            <span className="block text-xs text-slate-500">{p.english}</span>
+          </button>
+        ))}
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 p-4">
+        <button
+          onClick={listenToDriver}
+          disabled={listening}
+          className="w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white transition active:scale-95 disabled:opacity-60"
+        >
+          {listening ? "Listening…" : "🎤 The driver said something"}
+        </button>
+        {listenError && (
+          <p className="mt-2 text-sm text-red-600">{listenError}</p>
+        )}
+        {driverReply && (
+          <div className="mt-3 space-y-2 text-sm">
+            <p className="text-slate-500">Heard: {driverReply.transcript}</p>
+            <p className="font-semibold">{driverReply.english}</p>
+            {driverReply.reply_cantonese && (
+              <button
+                onClick={() => speakCantonese(driverReply.reply_cantonese)}
+                className="w-full rounded-lg bg-slate-100 p-2 text-left"
+              >
+                <span className="block font-semibold">
+                  Reply: {driverReply.reply_cantonese}
+                </span>
+                <span className="block text-xs text-slate-500">
+                  {driverReply.reply_english} · tap to speak
+                </span>
+              </button>
+            )}
+          </div>
+        )}
+      </section>
+
+      <p className="pb-4 text-center text-xs text-slate-400">
+        Alert fires {APPROACH_RADIUS_M} m before your stop · phrases spoken in
+        colloquial Cantonese
+      </p>
+    </main>
+  );
+}

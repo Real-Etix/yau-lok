@@ -1,0 +1,16 @@
+{
+  "name": "Yau Lok! 有落 — Cantonese copilot",
+  "short_name": "Yau Lok!",
+  "description": "Never miss your minibus stop again.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#dc2626",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}
