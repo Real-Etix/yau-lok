@@ -11,7 +11,12 @@ import {
   type RideState,
   type Stop,
 } from "@/hooks/useRideTracker";
-import { getBusRoute, getRouteEta, type RouteEta } from "@/lib/toolhub";
+import {
+  getBusRoute,
+  getRoadShape,
+  getRouteEta,
+  type RouteEta,
+} from "@/lib/toolhub";
 import { VOICE_PERSONAS, DEFAULT_PERSONA_KEY } from "@/data/voices";
 import RideMap from "@/components/RideMap";
 import { haversineMeters, lerp, type LatLng } from "@/lib/geo";
@@ -140,6 +145,24 @@ export default function RidePage() {
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [eta, setEta] = useState<RouteEta | null>(null);
+
+  // Trace the real road shape for whatever stops are loaded (Toolhub only
+  // has stop-to-stop fallback lines for GMB). Toolhub/straight lines remain
+  // the fallback if OSRM is unreachable.
+  useEffect(() => {
+    if (stops.length < 2) return;
+    let cancelled = false;
+    getRoadShape(stops)
+      .then((shape) => {
+        if (!cancelled) setRoutePath(shape);
+      })
+      .catch(() => {
+        // keep the existing (fallback) path
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [stops]);
 
   // The simulated ride starts at the boarding stop, not the route origin.
   const boardingIdx = Math.max(

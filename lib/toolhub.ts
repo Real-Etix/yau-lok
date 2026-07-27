@@ -86,6 +86,25 @@ export async function getRouteEta(
   );
 }
 
+/**
+ * Real road polyline for an ordered stop list (OSRM via /api/roadshape).
+ * Toolhub's GMB paths are stop-to-stop fallback lines; this traces streets.
+ */
+export async function getRoadShape(
+  stops: { lat: number; lng: number }[],
+): Promise<[number, number][]> {
+  const res = await fetch("/api/roadshape", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ points: stops.map((s) => [s.lat, s.lng]) }),
+  });
+  const body = await res.json();
+  if (!res.ok || !Array.isArray(body.shape)) {
+    throw new Error(body.error ?? "road shape failed");
+  }
+  return body.shape as [number, number][];
+}
+
 export async function getBusRoute(
   route: string,
   company: string = "gmb",
