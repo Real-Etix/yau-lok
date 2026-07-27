@@ -11,9 +11,9 @@ import {
   type RideState,
   type Stop,
 } from "@/hooks/useRideTracker";
-import { getBusRoute } from "@/lib/toolhub";
+import { getBusRoute, getRouteEta, type RouteEta } from "@/lib/toolhub";
 import { lerp, type LatLng } from "@/lib/geo";
-import { listenCantonese, speakCantonese } from "@/lib/speech";
+import { listenCantonese, speakCantonese, speakPhrase } from "@/lib/speech";
 
 const STATE_LABEL: Record<RideState, { text: string; className: string }> = {
   riding: { text: "On the way", className: "bg-emerald-100 text-emerald-900" },
@@ -54,7 +54,9 @@ function useSimulatedRide(active: boolean, stops: Stop[]) {
     }
     startRef.current ??= Date.now();
     const id = setInterval(() => {
-      const elapsed = Date.now() - (startRef.current ?? Date.now());
+      // reset() nulls startRef; restart the clock on the next tick
+      startRef.current ??= Date.now();
+      const elapsed = Date.now() - startRef.current;
       setProgress(Math.min(1, elapsed / SIM_RIDE_DURATION_MS));
     }, 250);
     return () => clearInterval(id);
@@ -94,8 +96,14 @@ export default function RidePage() {
   const [stops, setStops] = useState<Stop[]>(DEMO_STOPS);
   const [routeName, setRouteName] = useState(DEMO_ROUTE_NAME);
   const [routeCode, setRouteCode] = useState("");
+  const [routeRef, setRouteRef] = useState<{
+    routeId: string;
+    routeCode: string;
+    company: string;
+  } | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [eta, setEta] = useState<RouteEta | null>(null);
 
   const sim = useSimulatedRide(demoMode, stops);
   const gps = useGeolocation(!demoMode);
@@ -112,6 +120,12 @@ export default function RidePage() {
       setRouteName(
         `GMB ${r.routeCode} · ${r.origEn} → ${r.destEn} (live via Toolhub)`,
       );
+      setRouteRef({
+        routeId: r.routeId,
+        routeCode: r.routeCode,
+        company: r.company,
+      });
+      setEta(null);
       setDestinationSeq(r.stops[r.stops.length - 1].seq);
       simReset();
     } catch (e) {
@@ -141,15 +155,39 @@ export default function RidePage() {
     if (status.state === "approaching" && !alertedRef.current) {
       alertedRef.current = true;
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-      speakCantonese("就到喇");
+      speakPhrase("chime", "就到喇！");
     }
     if (status.state === "riding") alertedRef.current = false;
   }, [status.state]);
 
+  // Live minibus ETA (Toolhub transit_eta) at the stop nearest to us,
+  // for the loaded route. Refreshes every 30 s.
+  useEffect(() => {
+    if (!routeRef) return;
+    let cancelled = false;
+    const probe = position ?? stops[0];
+    const tick = async () => {
+      try {
+        const e = await getRouteEta(routeRef, probe.lat, probe.lng);
+        if (!cancelled) setEta(e);
+      } catch {
+        // ETA is decorative — never break the ride view over it
+      }
+    };
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+    // Re-anchor on route change only — not on every GPS tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeRef, stops]);
+
   const speak = useCallback(async (phrase: Phrase) => {
     setSpeaking(phrase.id);
     try {
-      await speakCantonese(phrase.cantonese);
+      await speakPhrase(phrase.id, phrase.cantonese);
     } finally {
       setTimeout(() => setSpeaking(null), 600);
     }
@@ -231,6 +269,17 @@ export default function RidePage() {
         </div>
         {routeError && (
           <p className="mt-1 text-sm text-red-600">{routeError}</p>
+        )}
+        {eta && eta.etaMinutes.length > 0 && (
+          <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-sm text-emerald-900">
+            🚐 Next minibus at {eta.stopNameEn}:{" "}
+            <span className="font-semibold">
+              {eta.etaMinutes.slice(0, 3).map((m) => `${m} min`).join(", ")}
+            </span>
+            <span className="ml-1 text-xs text-emerald-700">
+              live · Toolhub transit_eta
+            </span>
+          </p>
         )}
         <label className="mt-2 block text-sm">
           Get off at

@@ -20,6 +20,70 @@ export type TransitRoute = {
   stops: TransitStop[];
 };
 
+export type RouteEta = {
+  stopNameEn: string;
+  stopNameTc: string;
+  /** Minutes until each upcoming arrival at that stop, soonest first */
+  etaMinutes: number[];
+};
+
+/**
+ * Next arrivals of a route at the stop nearest to (lat, lng), via Toolhub's
+ * transit_eta tool. Prefers an exact route_id (direction) match, falls back
+ * to route code + operator. Returns null when the route has no live ETAs
+ * nearby (e.g. service ended for the day).
+ */
+export async function getRouteEta(
+  route: { routeId: string; routeCode: string; company: string },
+  lat: number,
+  lng: number,
+): Promise<RouteEta | null> {
+  const res = await fetch("/api/toolhub/transport/transit/eta", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ lat, lng }),
+  });
+  const body = await res.json();
+  if (!res.ok || !body.success) {
+    throw new Error(body.error?.message ?? "ETA lookup failed");
+  }
+  type RawEtaStop = {
+    name_en: string;
+    name_tc: string;
+    routes: {
+      route_id: string;
+      route_code: string;
+      company: string;
+      eta: { eta_remain: number | null }[];
+    }[];
+  };
+  const stops = (body.data?.results ?? []) as RawEtaStop[];
+  const pick = (
+    match: (r: RawEtaStop["routes"][number]) => boolean,
+  ): RouteEta | null => {
+    for (const stop of stops) {
+      const r = stop.routes.find(match);
+      if (r) {
+        return {
+          stopNameEn: stop.name_en,
+          stopNameTc: stop.name_tc,
+          etaMinutes: r.eta
+            .map((e) => e.eta_remain)
+            .filter((m): m is number => typeof m === "number"),
+        };
+      }
+    }
+    return null;
+  };
+  return (
+    pick((r) => r.route_id === route.routeId) ??
+    pick(
+      (r) =>
+        r.route_code === route.routeCode && r.company === route.company,
+    )
+  );
+}
+
 export async function getBusRoute(
   route: string,
   company: string = "gmb",

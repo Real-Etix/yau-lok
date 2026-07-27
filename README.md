@@ -56,14 +56,31 @@ Toolhub also exposes transit ETA/fares, geo search, weather, parking, and
 A&E waiting times — same `/api/toolhub/<tool-path>` proxy reaches all of
 them (base https://toolhub.prod.hkchat.app/v1, App-Name/App-Key headers).
 
-## Remaining team TODOs
+## Toolhub tools in use
 
-- [ ] Switch `listenCantonese()` in `lib/speech.ts` to MediaRecorder +
-      `/api/asr` (HKGAI Cantonese ASR) instead of browser SpeechRecognition
-- [ ] Measure TTS latency on venue Wi-Fi; pre-generate the 7 core phrases as
-      cached audio if slow
-- [ ] Wire `transit_eta` (Toolhub) into the status card ("next minibus in 4 min")
-- [ ] Try `tts-v2` / male voice; pick what sounds most natural shouted
+- `transit_route_detail` — route-code input → real stops + coordinates
+- `transit_eta` — live "next minibus at your stop: 0, 4, 9 min" line,
+  refreshed every 30 s (matches by route_id, falls back to code+operator;
+  empty outside service hours)
+- `transit_route_search` — validated, available for a route-picker UI
+
+## Done (was the TODO list)
+
+- [x] Mic flow records 4 s → 16 kHz WAV → HKGAI `speech_recognize`
+      (`/api/asr`), browser SpeechRecognition as fallback. Round-trip
+      verified: HKGAI TTS audio → HKGAI ASR → 「唔該前面巴士站有樓」
+- [x] TTS latency measured (0.5–2.2 s/phrase) → all 8 phrases pre-generated
+      into `public/audio/` by `scripts/generate-phrase-audio.mjs`; playback
+      order is cached file → live API → browser voice
+- [x] `transit_eta` wired into the ride screen
+- [x] Voice audition: rerun `node scripts/generate-phrase-audio.mjs tts-v2 male`
+      (or set HKGAI_TTS_MODEL / HKGAI_TTS_VOICE) after picking a voice
+
+## Remaining ideas
+
+- [ ] Re-record phrase pack with the chosen voice
+- [ ] Hot-word boost: pass 有落/落車 via `config.hot_keys` tuning in /api/asr
+- [ ] Weather tool ("bring an umbrella before you board")
 
 ## Judging-criteria mapping
 

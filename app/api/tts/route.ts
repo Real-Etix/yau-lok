@@ -6,9 +6,11 @@
 
 const SPEECH_HOST = process.env.HKGAI_SPEECH_URL; // e.g. https://openspeech.hkgai.net
 const SPEECH_TOKEN = process.env.HKGAI_SPEECH_TOKEN;
+const TTS_MODEL = process.env.HKGAI_TTS_MODEL ?? "tts-v1"; // tts-v1 | tts-v2
+const TTS_VOICE = process.env.HKGAI_TTS_VOICE ?? "female"; // female | male
 
 export async function POST(request: Request) {
-  const { text } = await request.json();
+  const { text, model, voice } = await request.json();
   if (typeof text !== "string" || !text.trim()) {
     return Response.json({ error: "text required" }, { status: 400 });
   }
@@ -29,10 +31,10 @@ export async function POST(request: Request) {
         Authorization: `Bearer ${SPEECH_TOKEN}`,
       },
       body: JSON.stringify({
-        model_name: "tts-v1",
+        model_name: model ?? TTS_MODEL,
         input: text,
         language: "cantonese",
-        voice: "female",
+        voice: voice ?? TTS_VOICE,
         type: "file",
         response_format: "wav",
       }),
