@@ -84,6 +84,7 @@ function useSimulatedRide(active: boolean, stops: Stop[]) {
 
 export default function RidePage() {
   const [demoMode, setDemoMode] = useState(true);
+  const [boardingSeq, setBoardingSeq] = useState(1);
   const [destinationSeq, setDestinationSeq] = useState<number | null>(5);
   const [coachMode, setCoachMode] = useState(true);
   const [speaking, setSpeaking] = useState<string | null>(null);
@@ -105,7 +106,13 @@ export default function RidePage() {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [eta, setEta] = useState<RouteEta | null>(null);
 
-  const sim = useSimulatedRide(demoMode, stops);
+  // The simulated ride starts at the boarding stop, not the route origin.
+  const boardingIdx = Math.max(
+    0,
+    stops.findIndex((s) => s.seq === boardingSeq),
+  );
+  const simStops = stops.slice(boardingIdx);
+  const sim = useSimulatedRide(demoMode, simStops);
   const gps = useGeolocation(!demoMode);
   const position = demoMode ? sim.position : gps.position;
 
@@ -126,6 +133,7 @@ export default function RidePage() {
         company: r.company,
       });
       setEta(null);
+      setBoardingSeq(r.stops[0].seq);
       setDestinationSeq(r.stops[r.stops.length - 1].seq);
       simReset();
     } catch (e) {
@@ -144,6 +152,24 @@ export default function RidePage() {
     if (tracked.state === "arrive_now") setReachedStop(true);
   }, [tracked.state]);
   useEffect(() => setReachedStop(false), [destinationSeq, demoMode, stops]);
+
+  // Changing the boarding stop restarts the (simulated) journey there,
+  // and the destination must stay after the boarding stop.
+  const firstRunRef = useRef(true);
+  useEffect(() => {
+    if (firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    setReachedStop(false);
+    simReset();
+    setDestinationSeq((d) => {
+      if (d !== null && d > boardingSeq) return d;
+      const next = stops.find((s) => s.seq > boardingSeq);
+      return next ? next.seq : d;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boardingSeq]);
   const status =
     reachedStop && tracked.state !== "arrive_now"
       ? { ...tracked, state: "arrived" as const }
@@ -160,15 +186,16 @@ export default function RidePage() {
     if (status.state === "riding") alertedRef.current = false;
   }, [status.state]);
 
-  // Live minibus ETA (Toolhub transit_eta) at the stop nearest to us,
-  // for the loaded route. Refreshes every 30 s.
+  // Live minibus ETA (Toolhub transit_eta) at the BOARDING stop — that's
+  // where the user is waiting to catch it. Refreshes every 30 s.
   useEffect(() => {
     if (!routeRef) return;
+    const anchor = stops.find((s) => s.seq === boardingSeq) ?? stops[0];
+    if (!anchor) return;
     let cancelled = false;
-    const probe = position ?? stops[0];
     const tick = async () => {
       try {
-        const e = await getRouteEta(routeRef, probe.lat, probe.lng);
+        const e = await getRouteEta(routeRef, anchor.lat, anchor.lng);
         if (!cancelled) setEta(e);
       } catch {
         // ETA is decorative — never break the ride view over it
@@ -180,9 +207,7 @@ export default function RidePage() {
       cancelled = true;
       clearInterval(id);
     };
-    // Re-anchor on route change only — not on every GPS tick.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeRef, stops]);
+  }, [routeRef, stops, boardingSeq]);
 
   const speak = useCallback(async (phrase: Phrase) => {
     setSpeaking(phrase.id);
@@ -270,9 +295,23 @@ export default function RidePage() {
         {routeError && (
           <p className="mt-1 text-sm text-red-600">{routeError}</p>
         )}
+        <label className="mt-2 block text-sm">
+          Get on at
+          <select
+            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            value={boardingSeq}
+            onChange={(e) => setBoardingSeq(Number(e.target.value))}
+          >
+            {stops.slice(0, -1).map((s) => (
+              <option key={s.seq} value={s.seq}>
+                {s.name.en} · {s.name.tc}
+              </option>
+            ))}
+          </select>
+        </label>
         {eta && eta.etaMinutes.length > 0 && (
           <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-sm text-emerald-900">
-            🚐 Next minibus at {eta.stopNameEn}:{" "}
+            🚐 Next minibus at your stop:{" "}
             <span className="font-semibold">
               {eta.etaMinutes.slice(0, 3).map((m) => `${m} min`).join(", ")}
             </span>
@@ -288,11 +327,13 @@ export default function RidePage() {
             value={destinationSeq ?? ""}
             onChange={(e) => setDestinationSeq(Number(e.target.value))}
           >
-            {stops.map((s) => (
-              <option key={s.seq} value={s.seq}>
-                {s.name.en} · {s.name.tc}
-              </option>
-            ))}
+            {stops
+              .filter((s) => s.seq > boardingSeq)
+              .map((s) => (
+                <option key={s.seq} value={s.seq}>
+                  {s.name.en} · {s.name.tc}
+                </option>
+              ))}
           </select>
         </label>
         {!demoMode && gps.error && (
@@ -310,6 +351,22 @@ export default function RidePage() {
             {status.nearestStop && (
               <> · near {status.nearestStop.name.en}</>
             )}
+            {status.destination &&
+              status.nearestStop &&
+              status.destination.seq - status.nearestStop.seq > 0 &&
+              status.state !== "arrived" && (
+                <>
+                  {" "}
+                  ·{" "}
+                  <span className="font-semibold">
+                    {status.destination.seq - status.nearestStop.seq}{" "}
+                    {status.destination.seq - status.nearestStop.seq === 1
+                      ? "stop"
+                      : "stops"}{" "}
+                    to go
+                  </span>
+                </>
+              )}
           </p>
         )}
         {demoMode && (
