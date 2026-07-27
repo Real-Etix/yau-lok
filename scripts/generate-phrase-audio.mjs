@@ -45,6 +45,7 @@ const PHRASES = [
   ["how-much", "唔該，幾多錢呀？"],
   ["excuse-me", "唔該借借！"],
   ["chime", "就到喇！"],
+  ["bus-coming", "車嚟喇，準備上車！"],
 ];
 
 const only = process.argv[2];

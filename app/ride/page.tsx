@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { DEMO_ROUTE_NAME, DEMO_STOPS } from "@/data/demo-route";
 import { MINIBUS_PHRASES, type Phrase } from "@/data/phrases";
@@ -14,7 +14,7 @@ import {
 import { getBusRoute, getRouteEta, type RouteEta } from "@/lib/toolhub";
 import { VOICE_PERSONAS, DEFAULT_PERSONA_KEY } from "@/data/voices";
 import RideMap from "@/components/RideMap";
-import { lerp, type LatLng } from "@/lib/geo";
+import { haversineMeters, lerp, type LatLng } from "@/lib/geo";
 import { listenCantonese, speakCantonese, speakPhrase } from "@/lib/speech";
 
 const STATE_LABEL: Record<RideState, { text: string; className: string }> = {
@@ -40,15 +40,31 @@ type DriverReply = {
   reply_english: string;
 };
 
-// Demo mode drives a simulated position along the stop polyline,
-// so the full journey can be shown indoors at pitch time.
-// Progress is wall-clock based so background-tab timer throttling
-// can't stall the ride mid-demo.
-const SIM_RIDE_DURATION_MS = 60_000;
+// Demo mode drives a simulated position along the stop polyline, so the
+// full journey can be shown indoors at pitch time. The bus moves at a
+// realistic urban minibus speed, played back as a labelled time-lapse
+// (distance-based, so long segments aren't warp-speed). Progress is
+// wall-clock based so background-tab throttling can't stall it.
+export const SIM_SPEED_KMH = 20;
+export const SIM_TIMELAPSE = 12;
 
 function useSimulatedRide(active: boolean, stops: Stop[]) {
   const [progress, setProgress] = useState(0); // 0..1 across whole route
   const startRef = useRef<number | null>(null);
+
+  // Cumulative distance along the stop polyline.
+  const geom = useMemo(() => {
+    const cum: number[] = [0];
+    for (let i = 1; i < stops.length; i++) {
+      cum.push(cum[i - 1] + haversineMeters(stops[i - 1], stops[i]));
+    }
+    return { cum, total: cum[cum.length - 1] ?? 0 };
+  }, [stops]);
+  const durationMs = Math.max(
+    10_000,
+    (geom.total / ((SIM_SPEED_KMH / 3.6) * SIM_TIMELAPSE)) * 1000,
+  );
+
   useEffect(() => {
     if (!active) {
       startRef.current = null;
@@ -59,18 +75,19 @@ function useSimulatedRide(active: boolean, stops: Stop[]) {
       // reset() nulls startRef; restart the clock on the next tick
       startRef.current ??= Date.now();
       const elapsed = Date.now() - startRef.current;
-      setProgress(Math.min(1, elapsed / SIM_RIDE_DURATION_MS));
+      setProgress(Math.min(1, elapsed / durationMs));
     }, 250);
     return () => clearInterval(id);
-  }, [active]);
+  }, [active, durationMs]);
 
   const position: LatLng | null =
-    active && stops.length >= 2
+    active && stops.length >= 2 && geom.total > 0
       ? (() => {
-          const segs = stops.length - 1;
-          const x = progress * segs;
-          const i = Math.min(Math.floor(x), segs - 1);
-          return lerp(stops[i], stops[i + 1], x - i);
+          const d = progress * geom.total;
+          let i = 0;
+          while (i < stops.length - 2 && geom.cum[i + 1] < d) i++;
+          const segLen = geom.cum[i + 1] - geom.cum[i] || 1;
+          return lerp(stops[i], stops[i + 1], (d - geom.cum[i]) / segLen);
         })()
       : null;
 
@@ -209,6 +226,27 @@ export default function RidePage() {
     }
     if (status.state === "riding") alertedRef.current = false;
   }, [status.state]);
+
+  // Pre-boarding is ETA-driven, not position-driven: the GMB feed has no
+  // vehicle GPS, so we never draw a guessed bus. When the ETA hits ≤1 min,
+  // alert the user to get ready to board.
+  const boardAlertRef = useRef(false);
+  useEffect(() => {
+    if (boarded) {
+      boardAlertRef.current = false;
+      return;
+    }
+    if (
+      !boardAlertRef.current &&
+      eta &&
+      eta.etaMinutes.length > 0 &&
+      eta.etaMinutes[0] <= 1
+    ) {
+      boardAlertRef.current = true;
+      if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+      speakPhrase("bus-coming", "車嚟喇，準備上車！", personaKey);
+    }
+  }, [eta, boarded, personaKey]);
 
   // Live minibus ETA (Toolhub transit_eta) at the BOARDING stop — that's
   // where the user is waiting to catch it. Refreshes every 30 s.
@@ -389,6 +427,11 @@ export default function RidePage() {
         boardingSeq={boardingSeq}
         destinationSeq={destinationSeq}
         riding={boarded}
+        waitingEtaLabel={
+          !boarded && eta && eta.etaMinutes.length > 0
+            ? `🚐 ${eta.etaMinutes[0] <= 0 ? "arriving now" : `${eta.etaMinutes[0]} min`}`
+            : null
+        }
       />
 
       {!boarded ? (
@@ -399,6 +442,13 @@ export default function RidePage() {
           🚐 I&apos;m on board — start tracking
           <span className="block text-sm font-normal opacity-80">
             waiting at {stops[boardingIdx]?.name.en}
+            {eta && eta.etaMinutes.length > 0 && (
+              <>
+                {" "}
+                · next in{" "}
+                {eta.etaMinutes[0] <= 0 ? "<1" : eta.etaMinutes[0]} min
+              </>
+            )}
           </span>
         </button>
       ) : (
@@ -432,7 +482,8 @@ export default function RidePage() {
         )}
         {demoMode && (
           <p className="mt-1 text-xs font-normal opacity-70">
-            simulated ride · {Math.round(sim.progress * 100)}% of route
+            simulated ride · {Math.round(sim.progress * 100)}% of route ·{" "}
+            {SIM_SPEED_KMH} km/h at ×{SIM_TIMELAPSE} time-lapse
           </p>
         )}
         {status.state === "arrived" && (

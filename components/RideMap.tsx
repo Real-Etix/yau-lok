@@ -17,6 +17,8 @@ type Props = {
   destinationSeq: number | null;
   /** Only show + follow the bus marker while on board */
   riding: boolean;
+  /** ETA label pinned to the boarding stop while waiting (no fake bus) */
+  waitingEtaLabel?: string | null;
 };
 
 export default function RideMap({
@@ -26,11 +28,13 @@ export default function RideMap({
   boardingSeq,
   destinationSeq,
   riding,
+  waitingEtaLabel,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const routeLayerRef = useRef<(CircleMarker | Polyline)[]>([]);
   const busRef = useRef<Marker | null>(null);
+  const fittedStopsRef = useRef<Stop[] | null>(null);
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
   // Map creation is async (dynamic import) — draw effects wait on this.
   const [ready, setReady] = useState(false);
@@ -81,14 +85,28 @@ export default function RideMap({
         fillColor: isBoard ? "#818cf8" : isDest ? "#f87171" : "#ffffff",
         fillOpacity: 1,
         weight: 2,
-      }).bindTooltip(
-        `${s.seq}. ${s.name.en}${isBoard ? " (get on)" : isDest ? " (get off)" : ""}`,
-      );
+      });
+      if (isBoard && waitingEtaLabel) {
+        marker.bindTooltip(waitingEtaLabel, {
+          permanent: true,
+          direction: "top",
+          offset: [0, -8],
+        });
+      } else {
+        marker.bindTooltip(
+          `${s.seq}. ${s.name.en}${isBoard ? " (get on)" : isDest ? " (get off)" : ""}`,
+        );
+      }
       marker.addTo(map);
       routeLayerRef.current.push(marker);
     }
-    map.fitBounds(poly.getBounds(), { padding: [20, 20] });
-  }, [ready, stops, path, boardingSeq, destinationSeq]);
+    // Zoom to the route only when the route itself changes — ETA label
+    // refreshes must not yank the viewport.
+    if (fittedStopsRef.current !== stops) {
+      fittedStopsRef.current = stops;
+      map.fitBounds(poly.getBounds(), { padding: [20, 20] });
+    }
+  }, [ready, stops, path, boardingSeq, destinationSeq, waitingEtaLabel]);
 
   // Move the minibus marker; follow it while riding.
   useEffect(() => {

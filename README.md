@@ -13,9 +13,13 @@ No stop announcements, no bell — you must shout 「唔該，有落！」 at th
 moment. The app:
 
 1. Pick your route, **get-on and get-off stops**; live ETA shows the next
-   minibus at your boarding stop (Toolhub `transit_eta`)
-2. Tap **"I'm on board"** — tracking starts on a **live map** (Leaflet + OSM)
-   with the minibus moving along the real route line
+   minibus at your boarding stop (Toolhub `transit_eta`) — pinned on the
+   map, with a spoken 「車嚟喇！」 alert when it's ≤1 min away. No guessed
+   bus positions: the GMB feed has ETAs, not vehicle GPS, so pre-boarding
+   is honestly ETA-driven.
+2. Tap **"I'm on board"** — now the phone IS on the vehicle, so tracking is
+   real GPS on a **live map** (Leaflet + OSM) along the actual route line.
+   Demo mode replays a ride at 20 km/h, ×12 time-lapse (labelled).
 3. Alerts you 400 m before your stop (vibration + Cantonese chime)
 4. **Speaks for you** — one giant button plays a loud, colloquial 「有落！」
    in your chosen **voice persona** (6 HKGAI Cantonese voices, incl.
