@@ -262,7 +262,18 @@ export default function RidePage() {
     }
   }, [routeCode, simReset]);
 
-  const tracked = useRideTracker(stops, destinationSeq, position);
+  // Full road polyline (not the boarding-onward slice) so distance is
+  // measured along the road the bus actually drives.
+  const fullRoadPath = useMemo<LatLng[]>(
+    () => routePath.map(([lat, lng]) => ({ lat, lng })),
+    [routePath],
+  );
+  const tracked = useRideTracker(
+    stops,
+    destinationSeq,
+    position,
+    fullRoadPath,
+  );
 
   // Latch "arrived": once we've been at the stop and are moving away
   // again, the ride is over — don't fall back to "coming up".
@@ -443,10 +454,7 @@ export default function RidePage() {
   const urgent =
     status.state === "arrive_now" || status.state === "approaching";
   const routeLoaded = routeRef !== null;
-  const stopsToGo =
-    status.destination && status.nearestStop
-      ? status.destination.seq - status.nearestStop.seq
-      : null;
+  const stopsToGo = status.stopsToGo;
 
   const phraseButton = (p: Phrase, compact = false) => (
     <button
@@ -651,7 +659,20 @@ export default function RidePage() {
           <p className="text-lg">{label.text}</p>
           {status.distanceM !== null && (
             <p className="mt-0.5 text-sm font-normal">
-              {Math.round(status.distanceM)} m
+              {status.etaMinutes !== null &&
+                status.state !== "arrived" &&
+                status.state !== "arrive_now" && (
+                <>
+                  <span className="font-semibold">
+                    about {status.etaMinutes} min
+                  </span>{" "}
+                  ·{" "}
+                </>
+              )}
+              {status.distanceM >= 1000
+                ? `${(status.distanceM / 1000).toFixed(1)} km`
+                : `${Math.round(status.distanceM)} m`}
+              {status.distanceMode === "straight" && " (direct)"}
               {stopsToGo !== null &&
                 stopsToGo > 0 &&
                 status.state !== "arrived" && (
