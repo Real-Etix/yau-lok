@@ -12,6 +12,8 @@ import {
   type Stop,
 } from "@/hooks/useRideTracker";
 import { getBusRoute, getRouteEta, type RouteEta } from "@/lib/toolhub";
+import { VOICE_PERSONAS, DEFAULT_PERSONA_KEY } from "@/data/voices";
+import RideMap from "@/components/RideMap";
 import { lerp, type LatLng } from "@/lib/geo";
 import { listenCantonese, speakCantonese, speakPhrase } from "@/lib/speech";
 
@@ -86,6 +88,21 @@ export default function RidePage() {
   const [demoMode, setDemoMode] = useState(true);
   const [boardingSeq, setBoardingSeq] = useState(1);
   const [destinationSeq, setDestinationSeq] = useState<number | null>(5);
+  // Has the user actually gotten on the minibus? Tracking starts here.
+  const [boarded, setBoarded] = useState(false);
+  const [personaKey, setPersonaKey] = useState(DEFAULT_PERSONA_KEY);
+  useEffect(() => {
+    const saved = localStorage.getItem("yau-lok-voice");
+    if (saved && VOICE_PERSONAS.some((p) => p.key === saved)) {
+      setPersonaKey(saved);
+    }
+  }, []);
+  const pickPersona = useCallback((key: string) => {
+    setPersonaKey(key);
+    localStorage.setItem("yau-lok-voice", key);
+    // Instant preview so the choice is audible
+    speakPhrase("yau-lok", "唔該，有落！", key);
+  }, []);
   const [coachMode, setCoachMode] = useState(true);
   const [speaking, setSpeaking] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
@@ -95,6 +112,7 @@ export default function RidePage() {
   // Route: bundled demo stops by default; a real route via HKGAI Toolhub
   // once loaded (transit_route_detail tool).
   const [stops, setStops] = useState<Stop[]>(DEMO_STOPS);
+  const [routePath, setRoutePath] = useState<[number, number][]>([]);
   const [routeName, setRouteName] = useState(DEMO_ROUTE_NAME);
   const [routeCode, setRouteCode] = useState("");
   const [routeRef, setRouteRef] = useState<{
@@ -112,9 +130,12 @@ export default function RidePage() {
     stops.findIndex((s) => s.seq === boardingSeq),
   );
   const simStops = stops.slice(boardingIdx);
-  const sim = useSimulatedRide(demoMode, simStops);
+  // The (simulated) ride only moves once the user says they're on board.
+  const sim = useSimulatedRide(demoMode && boarded, simStops);
   const gps = useGeolocation(!demoMode);
-  const position = demoMode ? sim.position : gps.position;
+  const position = demoMode
+    ? (sim.position ?? stops[boardingIdx] ?? null)
+    : gps.position;
 
   const simReset = sim.reset;
   const loadRoute = useCallback(async () => {
@@ -124,6 +145,8 @@ export default function RidePage() {
     try {
       const r = await getBusRoute(routeCode.trim().toUpperCase());
       setStops(r.stops);
+      setRoutePath(r.path);
+      setBoarded(false);
       setRouteName(
         `GMB ${r.routeCode} · ${r.origEn} → ${r.destEn} (live via Toolhub)`,
       );
@@ -162,6 +185,7 @@ export default function RidePage() {
       return;
     }
     setReachedStop(false);
+    setBoarded(false);
     simReset();
     setDestinationSeq((d) => {
       if (d !== null && d > boardingSeq) return d;
@@ -181,7 +205,7 @@ export default function RidePage() {
     if (status.state === "approaching" && !alertedRef.current) {
       alertedRef.current = true;
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-      speakPhrase("chime", "就到喇！");
+      speakPhrase("chime", "就到喇！", personaKey);
     }
     if (status.state === "riding") alertedRef.current = false;
   }, [status.state]);
@@ -209,14 +233,17 @@ export default function RidePage() {
     };
   }, [routeRef, stops, boardingSeq]);
 
-  const speak = useCallback(async (phrase: Phrase) => {
-    setSpeaking(phrase.id);
-    try {
-      await speakPhrase(phrase.id, phrase.cantonese);
-    } finally {
-      setTimeout(() => setSpeaking(null), 600);
-    }
-  }, []);
+  const speak = useCallback(
+    async (phrase: Phrase) => {
+      setSpeaking(phrase.id);
+      try {
+        await speakPhrase(phrase.id, phrase.cantonese, personaKey);
+      } finally {
+        setTimeout(() => setSpeaking(null), 600);
+      }
+    },
+    [personaKey],
+  );
 
   const listenToDriver = useCallback(async () => {
     setListening(true);
@@ -336,11 +363,45 @@ export default function RidePage() {
               ))}
           </select>
         </label>
+        <label className="mt-2 block text-sm">
+          Voice
+          <select
+            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            value={personaKey}
+            onChange={(e) => pickPersona(e.target.value)}
+          >
+            {VOICE_PERSONAS.map((p) => (
+              <option key={p.key} value={p.key}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
         {!demoMode && gps.error && (
           <p className="mt-2 text-sm text-red-600">GPS: {gps.error}</p>
         )}
       </section>
 
+      <RideMap
+        stops={stops}
+        path={routePath}
+        position={position}
+        boardingSeq={boardingSeq}
+        destinationSeq={destinationSeq}
+        riding={boarded}
+      />
+
+      {!boarded ? (
+        <button
+          onClick={() => setBoarded(true)}
+          className="rounded-2xl bg-indigo-600 p-4 text-center text-lg font-semibold text-white shadow-lg transition active:scale-95"
+        >
+          🚐 I&apos;m on board — start tracking
+          <span className="block text-sm font-normal opacity-80">
+            waiting at {stops[boardingIdx]?.name.en}
+          </span>
+        </button>
+      ) : (
       <section
         className={`rounded-2xl p-4 text-center font-semibold ${label.className}`}
       >
@@ -374,7 +435,20 @@ export default function RidePage() {
             simulated ride · {Math.round(sim.progress * 100)}% of route
           </p>
         )}
+        {status.state === "arrived" && (
+          <button
+            onClick={() => {
+              setBoarded(false);
+              setReachedStop(false);
+              sim.reset();
+            }}
+            className="mt-2 rounded-lg bg-white/70 px-3 py-1 text-sm font-medium"
+          >
+            ↺ New ride
+          </button>
+        )}
       </section>
+      )}
 
       <button
         onClick={() => speak(primaryPhrase)}
@@ -432,7 +506,9 @@ export default function RidePage() {
             <p className="font-semibold">{driverReply.english}</p>
             {driverReply.reply_cantonese && (
               <button
-                onClick={() => speakCantonese(driverReply.reply_cantonese)}
+                onClick={() =>
+                  speakCantonese(driverReply.reply_cantonese, personaKey)
+                }
                 className="w-full rounded-lg bg-slate-100 p-2 text-left"
               >
                 <span className="block font-semibold">

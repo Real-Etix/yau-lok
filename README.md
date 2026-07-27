@@ -12,11 +12,16 @@ over time (human-AI symbiosis, not replacement).
 No stop announcements, no bell — you must shout 「唔該，有落！」 at the right
 moment. The app:
 
-1. Tracks your position against the minibus route (GMB open data)
-2. Alerts you 400 m before your stop (vibration + Cantonese chime)
-3. **Speaks for you** — one giant button plays a loud, colloquial 「有落！」
-4. **Listens to the driver** and translates the reply, suggesting a response
-5. **Coaches** — Jyutping shown on every phrase so you learn to shout it yourself
+1. Pick your route, **get-on and get-off stops**; live ETA shows the next
+   minibus at your boarding stop (Toolhub `transit_eta`)
+2. Tap **"I'm on board"** — tracking starts on a **live map** (Leaflet + OSM)
+   with the minibus moving along the real route line
+3. Alerts you 400 m before your stop (vibration + Cantonese chime)
+4. **Speaks for you** — one giant button plays a loud, colloquial 「有落！」
+   in your chosen **voice persona** (6 HKGAI Cantonese voices, incl.
+   tts-v2's 暖心師奶 / 金牌阿Sir presets; all phrases pre-rendered per voice)
+5. **Listens to the driver** and translates the reply, suggesting a response
+6. **Coaches** — Jyutping shown on every phrase so you learn to shout it yourself
 
 ## Run it
 

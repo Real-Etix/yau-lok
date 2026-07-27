@@ -34,27 +34,34 @@ function browserSpeak(text: string) {
   window.speechSynthesis.speak(utterance);
 }
 
+import { getPersona } from "@/data/voices";
+
 /**
- * Speak a phrase from the pack: cached file first (generated at build time by
- * scripts/generate-phrase-audio.mjs), then live HKGAI TTS, then browser voice.
+ * Speak a phrase from the pack in the chosen persona: cached per-persona file
+ * first (scripts/generate-phrase-audio.mjs --all), then live HKGAI TTS, then
+ * browser voice.
  */
 export async function speakPhrase(
   id: string,
   text: string,
+  personaKey?: string,
 ): Promise<"cached" | "hkgai" | "browser"> {
-  if (await playUrl(`/audio/${id}.wav`)) return "cached";
-  return speakCantonese(text);
+  const persona = getPersona(personaKey);
+  if (await playUrl(`/audio/${persona.key}/${id}.wav`)) return "cached";
+  return speakCantonese(text, personaKey);
 }
 
 /** Speak arbitrary Cantonese text (dynamic content, e.g. suggested replies). */
 export async function speakCantonese(
   text: string,
+  personaKey?: string,
 ): Promise<"hkgai" | "browser"> {
+  const persona = getPersona(personaKey);
   try {
     const res = await fetch("/api/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, model: persona.model, voice: persona.voice }),
     });
     if (res.ok) {
       const audio = new Audio(URL.createObjectURL(await res.blob()));

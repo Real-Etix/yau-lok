@@ -18,6 +18,8 @@ export type TransitRoute = {
   origEn: string;
   destEn: string;
   stops: TransitStop[];
+  /** Road polyline as [lat, lng] pairs (falls back to stop-to-stop lines) */
+  path: [number, number][];
 };
 
 export type RouteEta = {
@@ -109,6 +111,15 @@ export async function getBusRoute(
     lng: number;
   };
   const r = body.data.results[0];
+  // GeoJSON LineString(s) in lng,lat order → [lat, lng]
+  const path: [number, number][] = (
+    (r.path?.features ?? []) as {
+      geometry: { type: string; coordinates: [number, number][] };
+    }[]
+  )
+    .filter((f) => f.geometry?.type === "LineString")
+    .flatMap((f) => f.geometry.coordinates)
+    .map(([lng, lat]) => [lat, lng] as [number, number]);
   return {
     routeId: r.route_id,
     routeCode: r.route_code,
@@ -116,6 +127,7 @@ export async function getBusRoute(
     direction: r.direction,
     origEn: r.orig_en,
     destEn: r.dest_en,
+    path,
     stops: (r.stops as RawStop[]).map((s) => ({
       stopId: s.stop_id,
       seq: s.seq,
