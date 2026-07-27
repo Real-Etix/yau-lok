@@ -19,6 +19,7 @@ import {
 } from "@/lib/toolhub";
 import { VOICE_PERSONAS, DEFAULT_PERSONA_KEY } from "@/data/voices";
 import RideMap from "@/components/RideMap";
+import SelectField from "@/components/SelectField";
 import { haversineMeters, lerp, type LatLng } from "@/lib/geo";
 import {
   friendlyMicError,
@@ -490,17 +491,22 @@ export default function RidePage() {
       </button>
 
       <div className="mt-2 flex gap-2">
-        <input
-          className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2.5 text-base"
-          placeholder="…or type: stop after the temple, big suitcase"
-          value={sayText}
-          onChange={(e) => setSayText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sayIt()}
-        />
+        <span className="field min-w-0 flex-1">
+          <span aria-hidden className="field-icon">
+            ✍️
+          </span>
+          <input
+            className="field-input"
+            placeholder="…or type: stop after the temple, big suitcase"
+            value={sayText}
+            onChange={(e) => setSayText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && sayIt()}
+          />
+        </span>
         <button
           onClick={sayIt}
           disabled={sayLoading || sayListening || !sayText.trim()}
-          className="rounded-lg bg-slate-900 px-4 text-sm font-medium text-white disabled:opacity-40"
+          className="rounded-xl bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
         >
           {sayLoading ? "…" : "Say it"}
         </button>
@@ -756,17 +762,22 @@ export default function RidePage() {
           {routeName}
         </p>
         <div className="mt-2 flex gap-2">
-          <input
-            className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2.5 text-base"
-            placeholder="GMB route code, e.g. 4C"
-            value={routeCode}
-            onChange={(e) => setRouteCode(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && loadRoute()}
-          />
+          <span className="field min-w-0 flex-1">
+            <span aria-hidden className="field-icon">
+              🚏
+            </span>
+            <input
+              className="field-input"
+              placeholder="GMB route code, e.g. 4C"
+              value={routeCode}
+              onChange={(e) => setRouteCode(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && loadRoute()}
+            />
+          </span>
           <button
             onClick={loadRoute}
             disabled={routeLoading || !routeCode.trim()}
-            className="rounded-lg bg-slate-900 px-4 text-sm font-medium text-white disabled:opacity-40"
+            className="rounded-xl bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
           >
             {routeLoading ? "Loading…" : "Load"}
           </button>
@@ -798,57 +809,56 @@ export default function RidePage() {
         )}
         {routeError && <p className="mt-2 text-sm text-red-600">{routeError}</p>}
 
-        <label className="mt-3 block text-sm font-medium">
-          Get on at
-          <select
-            className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-base font-normal"
-            value={boardingSeq}
-            onChange={(e) => setBoardingSeq(Number(e.target.value))}
-          >
-            {stops.slice(0, -1).map((s) => (
+        <SelectField
+          label="Get on at"
+          icon="📍"
+          accent="indigo"
+          value={boardingSeq}
+          onChange={(v) => setBoardingSeq(Number(v))}
+          hint={
+            eta && eta.etaMinutes.length > 0 ? (
+              <p className="mt-2 rounded-xl border border-emerald-100 bg-emerald-50 p-2.5 text-sm text-emerald-900">
+                🚐 Next minibus:{" "}
+                <span className="font-semibold">
+                  {eta.etaMinutes
+                    .slice(0, 3)
+                    .map((m) => (m <= 0 ? "now" : `${m} min`))
+                    .join(" · ")}
+                </span>
+                <span className="mt-0.5 block text-xs text-emerald-700">
+                  live from HKGAI Toolhub · updates every 30s
+                </span>
+              </p>
+            ) : routeLoaded ? (
+              <p className="mt-2 rounded-xl bg-slate-50 p-2.5 text-xs text-slate-500">
+                No live arrivals right now — service may have ended for today,
+                or this stop has no real-time feed.
+              </p>
+            ) : null
+          }
+        >
+          {stops.slice(0, -1).map((s) => (
+            <option key={s.seq} value={s.seq}>
+              {s.name.en} · {s.name.tc}
+            </option>
+          ))}
+        </SelectField>
+
+        <SelectField
+          label="Get off at"
+          icon="🏁"
+          accent="red"
+          value={destinationSeq ?? ""}
+          onChange={(v) => setDestinationSeq(Number(v))}
+        >
+          {stops
+            .filter((s) => s.seq > boardingSeq)
+            .map((s) => (
               <option key={s.seq} value={s.seq}>
                 {s.name.en} · {s.name.tc}
               </option>
             ))}
-          </select>
-        </label>
-
-        {eta && eta.etaMinutes.length > 0 ? (
-          <p className="mt-2 rounded-lg bg-emerald-50 p-2.5 text-sm text-emerald-900">
-            🚐 Next minibus:{" "}
-            <span className="font-semibold">
-              {eta.etaMinutes
-                .slice(0, 3)
-                .map((m) => (m <= 0 ? "now" : `${m} min`))
-                .join(" · ")}
-            </span>
-            <span className="mt-0.5 block text-xs text-emerald-700">
-              live from HKGAI Toolhub · updates every 30s
-            </span>
-          </p>
-        ) : routeLoaded ? (
-          <p className="mt-2 rounded-lg bg-slate-50 p-2.5 text-xs text-slate-500">
-            No live arrivals right now — service may have ended for today, or
-            this stop has no real-time feed.
-          </p>
-        ) : null}
-
-        <label className="mt-3 block text-sm font-medium">
-          Get off at
-          <select
-            className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-base font-normal"
-            value={destinationSeq ?? ""}
-            onChange={(e) => setDestinationSeq(Number(e.target.value))}
-          >
-            {stops
-              .filter((s) => s.seq > boardingSeq)
-              .map((s) => (
-                <option key={s.seq} value={s.seq}>
-                  {s.name.en} · {s.name.tc}
-                </option>
-              ))}
-          </select>
-        </label>
+        </SelectField>
 
         {!demoMode && gps.error && (
           <p className="mt-2 text-sm text-red-600">GPS: {gps.error}</p>
@@ -910,23 +920,23 @@ export default function RidePage() {
           {activeTool === "listen" && micPanel}
           {activeTool === "voice" && (
             <section className="rounded-2xl border border-slate-200 bg-white p-3">
-              <label className="block text-sm font-medium">
-                Cantonese voice
-                <select
-                  className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-base font-normal"
-                  value={personaKey}
-                  onChange={(e) => pickPersona(e.target.value)}
-                >
-                  {VOICE_PERSONAS.map((p) => (
-                    <option key={p.key} value={p.key}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className="mt-1.5 text-xs text-slate-500">
-                Six HKGAI Cantonese voices — picking one plays a sample.
-              </p>
+              <SelectField
+                label="Cantonese voice"
+                icon="🔊"
+                value={personaKey}
+                onChange={pickPersona}
+                hint={
+                  <p className="mt-1.5 text-xs text-slate-500">
+                    Six HKGAI Cantonese voices — picking one plays a sample.
+                  </p>
+                }
+              >
+                {VOICE_PERSONAS.map((p) => (
+                  <option key={p.key} value={p.key}>
+                    {p.label}
+                  </option>
+                ))}
+              </SelectField>
             </section>
           )}
         </div>
