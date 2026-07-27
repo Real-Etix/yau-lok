@@ -25,10 +25,12 @@ moment. The app:
    in your chosen **voice persona** (6 HKGAI Cantonese voices, incl.
    tts-v2's 暖心師奶 / 金牌阿Sir presets; all phrases pre-rendered per voice)
 5. **Listens to the driver** and translates the reply, suggesting a response
-6. **Says anything** — type any sentence in English and HKGAI rewrites it as
-   colloquial Cantonese (with Jyutping, a back-translation, and a politeness
-   note), then speaks it aloud. The phrase pack covers predictable moments;
-   this covers the rest.
+6. **Says anything** — **speak or type** any sentence in English and HKGAI
+   rewrites it as colloquial Cantonese (with Jyutping, a back-translation,
+   and a politeness note), then speaks it aloud. The phrase pack covers
+   predictable moments; this covers the rest. The voice path is a full
+   HKGAI round trip: their ASR hears your English (verified), their chat
+   model localises it, their TTS speaks it.
 7. **Coaches** — Jyutping shown on every phrase so you learn to shout it yourself
 
 ## Run it

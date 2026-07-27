@@ -150,12 +150,12 @@ async function recordWavBase64(): Promise<string> {
   }
 }
 
-async function hkgaiListen(): Promise<string> {
+async function hkgaiListen(hotKeys: string[]): Promise<string> {
   const audioBase64 = await recordWavBase64();
   const res = await fetch("/api/asr", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ audioBase64 }),
+    body: JSON.stringify({ audioBase64, hotKeys }),
   });
   if (!res.ok) throw new Error(`ASR ${res.status}`);
   const body = await res.json();
@@ -178,7 +178,7 @@ type BrowserSpeechRecognition = {
   stop: () => void;
 };
 
-function browserListen(): Promise<string> {
+function browserListen(lang: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const w = window as unknown as {
       SpeechRecognition?: new () => BrowserSpeechRecognition;
@@ -190,7 +190,7 @@ function browserListen(): Promise<string> {
       return;
     }
     const rec = new Ctor();
-    rec.lang = "zh-HK";
+    rec.lang = lang;
     rec.interimResults = false;
     rec.maxAlternatives = 1;
     let settled = false;
@@ -210,13 +210,45 @@ function browserListen(): Promise<string> {
 }
 
 /**
- * Listen once (~4 s) and resolve with a Cantonese transcript.
- * HKGAI's recognizer first; browser SpeechRecognition as fallback.
+ * Listen once (~4 s) and resolve with a transcript. HKGAI's recognizer is
+ * language-agnostic (verified on English and Cantonese); `fallbackLang` only
+ * matters for the browser SpeechRecognition fallback.
  */
-export async function listenCantonese(): Promise<string> {
+export async function listenOnce(
+  fallbackLang: string,
+  hotKeys: string[] = [],
+): Promise<string> {
   try {
-    return await hkgaiListen();
+    return await hkgaiListen(hotKeys);
   } catch {
-    return browserListen();
+    return browserListen(fallbackLang);
   }
+}
+
+/** Turn raw mic/ASR errors into something a rider can act on. */
+export function friendlyMicError(e: unknown): string {
+  const raw = (e instanceof Error ? e.message : String(e)).toLowerCase();
+  if (raw.includes("not-allowed") || raw.includes("denied") || raw.includes("permission")) {
+    return "Microphone blocked — allow mic access for this site, or type it instead.";
+  }
+  if (raw.includes("no-speech") || raw.includes("no speech")) {
+    return "Didn't catch that — tap and speak again, a bit louder.";
+  }
+  if (raw.includes("not supported") || raw.includes("notfound")) {
+    return "No microphone available on this device — type it instead.";
+  }
+  if (raw.includes("network")) {
+    return "Network problem reaching speech recognition — try again.";
+  }
+  return "Couldn't hear you — tap to try again, or type it instead.";
+}
+
+/** The driver just said something — Cantonese, with minibus hot words. */
+export function listenCantonese(): Promise<string> {
+  return listenOnce("zh-HK", ["有落", "巴士站", "落車"]);
+}
+
+/** The user dictating what they want to say, usually in English. */
+export function listenUserSpeech(): Promise<string> {
+  return listenOnce("en-US");
 }

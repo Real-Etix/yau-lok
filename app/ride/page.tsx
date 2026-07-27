@@ -20,7 +20,13 @@ import {
 import { VOICE_PERSONAS, DEFAULT_PERSONA_KEY } from "@/data/voices";
 import RideMap from "@/components/RideMap";
 import { haversineMeters, lerp, type LatLng } from "@/lib/geo";
-import { listenCantonese, speakCantonese, speakPhrase } from "@/lib/speech";
+import {
+  friendlyMicError,
+  listenCantonese,
+  listenUserSpeech,
+  speakCantonese,
+  speakPhrase,
+} from "@/lib/speech";
 
 const STATE_LABEL: Record<RideState, { text: string; className: string }> = {
   riding: { text: "On the way", className: "bg-emerald-100 text-emerald-900" },
@@ -150,6 +156,7 @@ export default function RidePage() {
   const [sayText, setSayText] = useState("");
   const [sayResult, setSayResult] = useState<SayResult | null>(null);
   const [sayLoading, setSayLoading] = useState(false);
+  const [sayListening, setSayListening] = useState(false);
   const [sayError, setSayError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [activeTool, setActiveTool] = useState<ToolId | null>(null);
@@ -354,30 +361,52 @@ export default function RidePage() {
     [personaKey],
   );
 
-  // Type anything → HKGAI turns it into colloquial Cantonese → speak it.
-  const sayIt = useCallback(async () => {
-    const text = sayText.trim();
-    if (!text) return;
-    setSayLoading(true);
+  // Say anything → HKGAI turns it into colloquial Cantonese → speak it.
+  const runSay = useCallback(
+    async (input: string) => {
+      const text = input.trim();
+      if (!text) return;
+      setSayLoading(true);
+      setSayError(null);
+      setSayResult(null);
+      try {
+        const res = await fetch("/api/say", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "could not translate");
+        setSayResult(data);
+        // Speak immediately — that's the whole point
+        await speakCantonese(data.cantonese, personaKey);
+      } catch (e) {
+        setSayError(e instanceof Error ? e.message : "Could not translate");
+      } finally {
+        setSayLoading(false);
+      }
+    },
+    [personaKey],
+  );
+
+  const sayIt = useCallback(() => runSay(sayText), [runSay, sayText]);
+
+  // Speak instead of typing: HKGAI ASR handles English too, so the whole
+  // round trip (your voice → their language → spoken aloud) is one platform.
+  const sayByVoice = useCallback(async () => {
+    setSayListening(true);
     setSayError(null);
     setSayResult(null);
     try {
-      const res = await fetch("/api/say", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "could not translate");
-      setSayResult(data);
-      // Speak immediately — that's the whole point
-      await speakCantonese(data.cantonese, personaKey);
+      const heard = await listenUserSpeech();
+      setSayText(heard);
+      setSayListening(false);
+      await runSay(heard);
     } catch (e) {
-      setSayError(e instanceof Error ? e.message : "Could not translate");
-    } finally {
-      setSayLoading(false);
+      setSayError(friendlyMicError(e));
+      setSayListening(false);
     }
-  }, [sayText, personaKey]);
+  }, [runSay]);
 
   const listenToDriver = useCallback(async () => {
     setListening(true);
@@ -440,20 +469,37 @@ export default function RidePage() {
         Say anything · AI
       </p>
       <p className="mt-0.5 text-xs text-slate-500">
-        Type in English — HKGAI turns it into what a local would actually say,
-        then speaks it out loud.
+        Speak or type in English — HKGAI turns it into what a local would
+        actually say, then says it out loud for you.
       </p>
+
+      <button
+        onClick={sayByVoice}
+        disabled={sayListening || sayLoading}
+        className={`mt-2 w-full rounded-xl p-3.5 text-center font-semibold transition active:scale-95 disabled:opacity-70 ${
+          sayListening
+            ? "animate-pulse bg-red-600 text-white"
+            : "bg-indigo-600 text-white"
+        }`}
+      >
+        {sayListening
+          ? "🔴 Listening… speak now"
+          : sayLoading
+            ? "Translating…"
+            : "🎙️ Hold a thought — speak it"}
+      </button>
+
       <div className="mt-2 flex gap-2">
         <input
           className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2.5 text-base"
-          placeholder="e.g. stop after the temple, I have a big suitcase"
+          placeholder="…or type: stop after the temple, big suitcase"
           value={sayText}
           onChange={(e) => setSayText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && sayIt()}
         />
         <button
           onClick={sayIt}
-          disabled={sayLoading || !sayText.trim()}
+          disabled={sayLoading || sayListening || !sayText.trim()}
           className="rounded-lg bg-slate-900 px-4 text-sm font-medium text-white disabled:opacity-40"
         >
           {sayLoading ? "…" : "Say it"}
