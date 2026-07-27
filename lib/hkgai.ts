@@ -1,7 +1,10 @@
 // Server-side HKGAI Studio client (Modelhub is OpenAI-compatible).
 // Set credentials in .env.local — see .env.example.
 
-const BASE_URL = process.env.HKGAI_BASE_URL; // e.g. https://<modelhub-host>/v1
+// Accept the base URL with or without the /v1 suffix.
+const BASE_URL = process.env.HKGAI_BASE_URL
+  ? process.env.HKGAI_BASE_URL.replace(/\/+$/, "").replace(/\/v1$/, "") + "/v1"
+  : undefined;
 const API_KEY = process.env.HKGAI_API_KEY;
 const CHAT_MODEL = process.env.HKGAI_CHAT_MODEL ?? "hkgai-v1";
 
