@@ -5,7 +5,13 @@
 // moving minibus (the user's phone position while on board).
 
 import { useEffect, useRef, useState } from "react";
-import type { Map as LeafletMap, CircleMarker, Marker, Polyline } from "leaflet";
+import type {
+  Map as LeafletMap,
+  Circle,
+  CircleMarker,
+  Marker,
+  Polyline,
+} from "leaflet";
 import type { LatLng } from "@/lib/geo";
 import type { Stop } from "@/hooks/useRideTracker";
 
@@ -19,6 +25,8 @@ type Props = {
   riding: boolean;
   /** ETA label pinned to the boarding stop while waiting (no fake bus) */
   waitingEtaLabel?: string | null;
+  /** GPS accuracy radius in meters (live mode only) — drawn around the bus */
+  accuracyM?: number | null;
 };
 
 export default function RideMap({
@@ -29,11 +37,13 @@ export default function RideMap({
   destinationSeq,
   riding,
   waitingEtaLabel,
+  accuracyM,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const routeLayerRef = useRef<(CircleMarker | Polyline)[]>([]);
   const busRef = useRef<Marker | null>(null);
+  const accuracyRef = useRef<Circle | null>(null);
   const fittedStopsRef = useRef<Stop[] | null>(null);
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
   // Map creation is async (dynamic import) — draw effects wait on this.
@@ -116,7 +126,27 @@ export default function RideMap({
     if (!riding || !position) {
       busRef.current?.remove();
       busRef.current = null;
+      accuracyRef.current?.remove();
+      accuracyRef.current = null;
       return;
+    }
+    // GPS accuracy halo (live mode only)
+    if (typeof accuracyM === "number" && accuracyM > 0) {
+      if (!accuracyRef.current) {
+        accuracyRef.current = L.circle([position.lat, position.lng], {
+          radius: accuracyM,
+          color: "#4f46e5",
+          weight: 1,
+          fillColor: "#818cf8",
+          fillOpacity: 0.15,
+        }).addTo(map);
+      } else {
+        accuracyRef.current.setLatLng([position.lat, position.lng]);
+        accuracyRef.current.setRadius(accuracyM);
+      }
+    } else {
+      accuracyRef.current?.remove();
+      accuracyRef.current = null;
     }
     if (!busRef.current) {
       busRef.current = L.marker([position.lat, position.lng], {
@@ -132,7 +162,7 @@ export default function RideMap({
       busRef.current.setLatLng([position.lat, position.lng]);
     }
     map.panTo([position.lat, position.lng], { animate: true });
-  }, [ready, position, riding]);
+  }, [ready, position, riding, accuracyM]);
 
   return (
     <div

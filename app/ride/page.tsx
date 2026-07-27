@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { DEMO_ROUTE_NAME, DEMO_STOPS } from "@/data/demo-route";
 import { MINIBUS_PHRASES, type Phrase } from "@/data/phrases";
-import { useGeolocation } from "@/hooks/useGeolocation";
+import { useGeolocation, useWakeLock } from "@/hooks/useGeolocation";
 import {
   useRideTracker,
   APPROACH_RADIUS_M,
@@ -153,6 +153,8 @@ export default function RidePage() {
   const position = demoMode
     ? (sim.position ?? stops[boardingIdx] ?? null)
     : gps.position;
+  // Phone GPS dies when the screen sleeps — hold a wake lock during the ride.
+  useWakeLock(boarded && !demoMode);
 
   const simReset = sim.reset;
   const loadRoute = useCallback(async () => {
@@ -427,6 +429,7 @@ export default function RidePage() {
         boardingSeq={boardingSeq}
         destinationSeq={destinationSeq}
         riding={boarded}
+        accuracyM={demoMode ? null : gps.accuracy}
         waitingEtaLabel={
           !boarded && eta && eta.etaMinutes.length > 0
             ? `🚐 ${eta.etaMinutes[0] <= 0 ? "arriving now" : `${eta.etaMinutes[0]} min`}`
@@ -480,10 +483,16 @@ export default function RidePage() {
               )}
           </p>
         )}
-        {demoMode && (
+        {demoMode ? (
           <p className="mt-1 text-xs font-normal opacity-70">
             simulated ride · {Math.round(sim.progress * 100)}% of route ·{" "}
             {SIM_SPEED_KMH} km/h at ×{SIM_TIMELAPSE} time-lapse
+          </p>
+        ) : (
+          <p className="mt-1 text-xs font-normal opacity-70">
+            {gps.position
+              ? `live GPS · ±${Math.round(gps.accuracy ?? 0)} m · screen kept awake`
+              : "waiting for GPS fix…"}
           </p>
         )}
         {status.state === "arrived" && (
