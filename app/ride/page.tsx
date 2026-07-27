@@ -45,6 +45,15 @@ type DriverReply = {
   reply_english: string;
 };
 
+type ToolId = "phrases" | "say" | "listen" | "voice";
+
+const TOOLS: { id: ToolId; label: string }[] = [
+  { id: "phrases", label: "🗣️ Ask the driver" },
+  { id: "say", label: "✍️ Say anything · AI" },
+  { id: "listen", label: "🎤 Listen" },
+  { id: "voice", label: "🔊 Voice" },
+];
+
 type SayResult = {
   cantonese: string;
   jyutping: string;
@@ -143,6 +152,7 @@ export default function RidePage() {
   const [sayLoading, setSayLoading] = useState(false);
   const [sayError, setSayError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [activeTool, setActiveTool] = useState<ToolId | null>(null);
   const [driverReply, setDriverReply] = useState<DriverReply | null>(null);
   const [listenError, setListenError] = useState<string | null>(null);
 
@@ -794,20 +804,6 @@ export default function RidePage() {
           </select>
         </label>
 
-        <label className="mt-3 block text-sm font-medium">
-          Voice
-          <select
-            className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-base font-normal"
-            value={personaKey}
-            onChange={(e) => pickPersona(e.target.value)}
-          >
-            {VOICE_PERSONAS.map((p) => (
-              <option key={p.key} value={p.key}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </label>
         {!demoMode && gps.error && (
           <p className="mt-2 text-sm text-red-600">GPS: {gps.error}</p>
         )}
@@ -838,18 +834,57 @@ export default function RidePage() {
         </span>
       </button>
 
+      {/* Secondary tools stay one tap away instead of stacked on the page */}
       <section>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-          Ask before you board
-        </p>
-        <div className="grid grid-cols-1 gap-2">
-          {boardingPhrases.map((p) => phraseButton(p))}
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+          {TOOLS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() =>
+                setActiveTool((cur) => (cur === t.id ? null : t.id))
+              }
+              className={`shrink-0 rounded-full px-3.5 py-2 text-sm font-medium transition active:scale-95 ${
+                activeTool === t.id
+                  ? "bg-slate-900 text-white"
+                  : "border border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-2">
+          {activeTool === "phrases" && (
+            <div className="grid grid-cols-1 gap-2">
+              {boardingPhrases.map((p) => phraseButton(p))}
+            </div>
+          )}
+          {activeTool === "say" && composer}
+          {activeTool === "listen" && micPanel}
+          {activeTool === "voice" && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-3">
+              <label className="block text-sm font-medium">
+                Cantonese voice
+                <select
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-base font-normal"
+                  value={personaKey}
+                  onChange={(e) => pickPersona(e.target.value)}
+                >
+                  {VOICE_PERSONAS.map((p) => (
+                    <option key={p.key} value={p.key}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="mt-1.5 text-xs text-slate-500">
+                Six HKGAI Cantonese voices — picking one plays a sample.
+              </p>
+            </section>
+          )}
         </div>
       </section>
-
-      {composer}
-
-      {micPanel}
 
       <p className="pb-4 text-center text-xs text-slate-400">
         Alert fires {APPROACH_RADIUS_M} m before your stop · phrases spoken in
