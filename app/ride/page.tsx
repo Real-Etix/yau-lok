@@ -108,8 +108,10 @@ function useSimulatedRide(active: boolean, stops: Stop[]) {
 
 export default function RidePage() {
   const [demoMode, setDemoMode] = useState(true);
-  const [boardingSeq, setBoardingSeq] = useState(1);
-  const [destinationSeq, setDestinationSeq] = useState<number | null>(5);
+  const [boardingSeq, setBoardingSeq] = useState(DEMO_STOPS[0].seq);
+  const [destinationSeq, setDestinationSeq] = useState<number | null>(
+    DEMO_STOPS[DEMO_STOPS.length - 1].seq,
+  );
   // Has the user actually gotten on the minibus? Tracking starts here.
   const [boarded, setBoarded] = useState(false);
   const [personaKey, setPersonaKey] = useState(DEFAULT_PERSONA_KEY);
@@ -331,45 +333,253 @@ export default function RidePage() {
 
   const label = STATE_LABEL[status.state];
   const primaryPhrase = MINIBUS_PHRASES.find((p) => p.primary)!;
-  const otherPhrases = MINIBUS_PHRASES.filter((p) => !p.primary);
+  // Surface the phrases that match the moment: boarding questions while
+  // you wait, "let me off here" variants once you're riding.
+  const boardingPhrases = MINIBUS_PHRASES.filter(
+    (p) => p.context === "boarding",
+  );
+  const ridingPhrases = MINIBUS_PHRASES.filter(
+    (p) => !p.primary && p.context !== "boarding",
+  );
+  const urgent =
+    status.state === "arrive_now" || status.state === "approaching";
+  const routeLoaded = routeRef !== null;
+  const stopsToGo =
+    status.destination && status.nearestStop
+      ? status.destination.seq - status.nearestStop.seq
+      : null;
 
+  const phraseButton = (p: Phrase, compact = false) => (
+    <button
+      key={p.id}
+      onClick={() => speak(p)}
+      className={`rounded-xl border border-slate-200 bg-white p-3 text-left transition active:scale-95 ${
+        compact ? "min-w-[10.5rem] shrink-0" : ""
+      } ${speaking === p.id ? "ring-2 ring-amber-400" : ""}`}
+    >
+      <span className="block text-base font-semibold">{p.cantonese}</span>
+      {coachMode && (
+        <span className="block text-xs text-slate-500">{p.jyutping}</span>
+      )}
+      <span className="block text-xs text-slate-500">{p.english}</span>
+    </button>
+  );
+
+  const micPanel = (
+    <section className="rounded-2xl border border-slate-200 bg-white p-3">
+      <button
+        onClick={listenToDriver}
+        disabled={listening}
+        className="w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white transition active:scale-95 disabled:opacity-60"
+      >
+        {listening ? "Listening…" : "🎤 The driver said something"}
+      </button>
+      {listenError && <p className="mt-2 text-sm text-red-600">{listenError}</p>}
+      {driverReply && (
+        <div className="mt-3 space-y-2 text-sm">
+          <p className="text-slate-500">Heard: {driverReply.transcript}</p>
+          <p className="font-semibold">{driverReply.english}</p>
+          {driverReply.reply_cantonese && (
+            <button
+              onClick={() =>
+                speakCantonese(driverReply.reply_cantonese, personaKey)
+              }
+              className="w-full rounded-lg bg-slate-100 p-2 text-left"
+            >
+              <span className="block font-semibold">
+                Reply: {driverReply.reply_cantonese}
+              </span>
+              <span className="block text-xs text-slate-500">
+                {driverReply.reply_english} · tap to speak
+              </span>
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+
+  const header = (
+    <header className="flex shrink-0 items-center justify-between">
+      <Link href="/" className="text-sm font-medium text-slate-500">
+        ← Yau Lok!
+      </Link>
+      <div className="flex gap-2 text-xs">
+        <button
+          onClick={() => {
+            setDemoMode((d) => !d);
+            sim.reset();
+          }}
+          className={`rounded-full px-3 py-1.5 font-medium ${
+            demoMode ? "bg-indigo-600 text-white" : "bg-slate-900 text-white"
+          }`}
+        >
+          {demoMode ? "Demo ride" : "Live GPS"}
+        </button>
+        <button
+          onClick={() => setCoachMode((c) => !c)}
+          className={`rounded-full px-3 py-1.5 font-medium ${
+            coachMode ? "bg-teal-600 text-white" : "bg-slate-200 text-slate-700"
+          }`}
+        >
+          Coach
+        </button>
+      </div>
+    </header>
+  );
+
+  const shoutButton = (
+    <button
+      onClick={() => speak(primaryPhrase)}
+      className={`w-full rounded-3xl text-center shadow-lg transition active:scale-95 ${
+        status.state === "arrive_now"
+          ? "animate-pulse bg-red-600 p-7 text-white"
+          : status.state === "approaching"
+            ? "bg-red-600 p-6 text-white"
+            : "bg-slate-900 p-5 text-white"
+      } ${speaking === primaryPhrase.id ? "ring-4 ring-amber-400" : ""}`}
+    >
+      <span
+        className={`block font-bold ${
+          status.state === "arrive_now" ? "text-4xl" : "text-3xl"
+        }`}
+      >
+        {primaryPhrase.cantonese}
+      </span>
+      {coachMode && (
+        <span className="mt-1 block text-sm opacity-80">
+          {primaryPhrase.jyutping}
+        </span>
+      )}
+      <span className="mt-1 block text-sm opacity-80">
+        {primaryPhrase.english} · tap to speak for me
+      </span>
+    </button>
+  );
+
+  // ---- Riding: map-first, one primary action pinned in the thumb zone ----
+  if (boarded) {
+    return (
+      <main className="mx-auto flex h-dvh max-w-md flex-col gap-3 overflow-x-hidden p-4">
+        {header}
+
+        <button
+          onClick={() => setBoarded(false)}
+          className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-xs text-slate-500"
+        >
+          {routeName.replace(" (live via Toolhub)", "")}
+          <span className="mt-0.5 block font-medium text-slate-800">
+            {stops[boardingIdx]?.name.en} → {status.destination?.name.en}
+            <span className="ml-1 font-normal text-indigo-600">· change</span>
+          </span>
+        </button>
+
+        <section
+          className={`shrink-0 rounded-2xl p-3 text-center font-semibold ${label.className}`}
+        >
+          <p className="text-lg">{label.text}</p>
+          {status.distanceM !== null && (
+            <p className="mt-0.5 text-sm font-normal">
+              {Math.round(status.distanceM)} m
+              {stopsToGo !== null &&
+                stopsToGo > 0 &&
+                status.state !== "arrived" && (
+                  <>
+                    {" "}
+                    · <span className="font-semibold">
+                      {stopsToGo} {stopsToGo === 1 ? "stop" : "stops"} to go
+                    </span>
+                  </>
+                )}
+            </p>
+          )}
+          <p className="mt-0.5 text-xs font-normal opacity-70">
+            {demoMode
+              ? `simulated · ${Math.round(sim.progress * 100)}% · ${SIM_SPEED_KMH} km/h at ×${SIM_TIMELAPSE}`
+              : gps.position
+                ? `live GPS · ±${Math.round(gps.accuracy ?? 0)} m · screen awake`
+                : "waiting for GPS fix…"}
+          </p>
+          {status.state === "arrived" && (
+            <button
+              onClick={() => {
+                setBoarded(false);
+                setReachedStop(false);
+                sim.reset();
+              }}
+              className="mt-2 rounded-lg bg-white/70 px-3 py-1.5 text-sm font-medium"
+            >
+              ↺ New ride
+            </button>
+          )}
+        </section>
+
+        <RideMap
+          stops={stops}
+          path={routePath}
+          position={position}
+          boardingSeq={boardingSeq}
+          destinationSeq={destinationSeq}
+          riding
+          tall
+          urgent={urgent}
+          accuracyM={demoMode ? null : gps.accuracy}
+        />
+
+        {/* Pinned action zone: thumb-reachable, no scrolling to shout */}
+        <div className="w-full min-w-0 shrink-0 space-y-2 pb-[env(safe-area-inset-bottom)]">
+          {shoutButton}
+          <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 pb-1">
+            {ridingPhrases.map((p) => phraseButton(p, true))}
+            <button
+              onClick={listenToDriver}
+              disabled={listening}
+              className="min-w-[10.5rem] shrink-0 rounded-xl bg-indigo-600 p-3 text-left text-sm font-semibold text-white transition active:scale-95 disabled:opacity-60"
+            >
+              {listening ? "Listening…" : "🎤 Driver said something"}
+            </button>
+          </div>
+          {driverReply && (
+            <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
+              <p className="font-semibold">{driverReply.english}</p>
+              {driverReply.reply_cantonese && (
+                <button
+                  onClick={() =>
+                    speakCantonese(driverReply.reply_cantonese, personaKey)
+                  }
+                  className="mt-1 w-full rounded-lg bg-slate-100 p-2 text-left"
+                >
+                  <span className="block font-semibold">
+                    Reply: {driverReply.reply_cantonese}
+                  </span>
+                  <span className="block text-xs text-slate-500">
+                    {driverReply.reply_english} · tap to speak
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
+          {listenError && (
+            <p className="text-center text-sm text-red-600">{listenError}</p>
+          )}
+        </div>
+      </main>
+    );
+  }
+
+  // ---- Waiting: set up the journey, watch the ETA ----
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 p-4">
-      <header className="flex items-center justify-between">
-        <Link href="/" className="text-sm text-slate-500">
-          ← Yau Lok!
-        </Link>
-        <div className="flex gap-2 text-xs">
-          <button
-            onClick={() => {
-              setDemoMode((d) => !d);
-              sim.reset();
-            }}
-            className={`rounded-full px-3 py-1 font-medium ${
-              demoMode ? "bg-indigo-600 text-white" : "bg-slate-200"
-            }`}
-          >
-            {demoMode ? "Demo ride" : "Live GPS"}
-          </button>
-          <button
-            onClick={() => setCoachMode((c) => !c)}
-            className={`rounded-full px-3 py-1 font-medium ${
-              coachMode ? "bg-teal-600 text-white" : "bg-slate-200"
-            }`}
-          >
-            Coach
-          </button>
-        </div>
-      </header>
+      {header}
 
-      <section className="rounded-2xl border border-slate-200 p-4">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <p className="text-xs uppercase tracking-wide text-slate-500">
           {routeName}
         </p>
         <div className="mt-2 flex gap-2">
           <input
-            className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2 text-sm"
-            placeholder="GMB route code, e.g. 5"
+            className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2.5 text-base"
+            placeholder="GMB route code, e.g. 4C"
             value={routeCode}
             onChange={(e) => setRouteCode(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && loadRoute()}
@@ -377,18 +587,42 @@ export default function RidePage() {
           <button
             onClick={loadRoute}
             disabled={routeLoading || !routeCode.trim()}
-            className="rounded-lg bg-slate-900 px-3 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-lg bg-slate-900 px-4 text-sm font-medium text-white disabled:opacity-40"
           >
-            {routeLoading ? "Loading…" : "Load route"}
+            {routeLoading ? "Loading…" : "Load"}
           </button>
         </div>
-        {routeError && (
-          <p className="mt-1 text-sm text-red-600">{routeError}</p>
+        {!routeLoaded && !routeLoading && !routeError && (
+          <p className="mt-2 text-xs text-slate-500">
+            Bundled route snapshot — load it live for real-time arrivals. Try{" "}
+            <button
+              onClick={() => setRouteCode("4C")}
+              className="font-semibold text-indigo-600 underline"
+            >
+              4C
+            </button>{" "}
+            or{" "}
+            <button
+              onClick={() => setRouteCode("5")}
+              className="font-semibold text-indigo-600 underline"
+            >
+              5
+            </button>{" "}
+            (Hong Kong Island).
+          </p>
         )}
-        <label className="mt-2 block text-sm">
+        {routeLoading && (
+          <div className="mt-3 space-y-2">
+            <div className="h-9 animate-pulse rounded-lg bg-slate-100" />
+            <div className="h-9 animate-pulse rounded-lg bg-slate-100" />
+          </div>
+        )}
+        {routeError && <p className="mt-2 text-sm text-red-600">{routeError}</p>}
+
+        <label className="mt-3 block text-sm font-medium">
           Get on at
           <select
-            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-base font-normal"
             value={boardingSeq}
             onChange={(e) => setBoardingSeq(Number(e.target.value))}
           >
@@ -399,21 +633,31 @@ export default function RidePage() {
             ))}
           </select>
         </label>
-        {eta && eta.etaMinutes.length > 0 && (
-          <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-sm text-emerald-900">
-            🚐 Next minibus at your stop:{" "}
+
+        {eta && eta.etaMinutes.length > 0 ? (
+          <p className="mt-2 rounded-lg bg-emerald-50 p-2.5 text-sm text-emerald-900">
+            🚐 Next minibus:{" "}
             <span className="font-semibold">
-              {eta.etaMinutes.slice(0, 3).map((m) => `${m} min`).join(", ")}
+              {eta.etaMinutes
+                .slice(0, 3)
+                .map((m) => (m <= 0 ? "now" : `${m} min`))
+                .join(" · ")}
             </span>
-            <span className="ml-1 text-xs text-emerald-700">
-              live · Toolhub transit_eta
+            <span className="mt-0.5 block text-xs text-emerald-700">
+              live from HKGAI Toolhub · updates every 30s
             </span>
           </p>
-        )}
-        <label className="mt-2 block text-sm">
+        ) : routeLoaded ? (
+          <p className="mt-2 rounded-lg bg-slate-50 p-2.5 text-xs text-slate-500">
+            No live arrivals right now — service may have ended for today, or
+            this stop has no real-time feed.
+          </p>
+        ) : null}
+
+        <label className="mt-3 block text-sm font-medium">
           Get off at
           <select
-            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-base font-normal"
             value={destinationSeq ?? ""}
             onChange={(e) => setDestinationSeq(Number(e.target.value))}
           >
@@ -426,10 +670,11 @@ export default function RidePage() {
               ))}
           </select>
         </label>
-        <label className="mt-2 block text-sm">
+
+        <label className="mt-3 block text-sm font-medium">
           Voice
           <select
-            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-base font-normal"
             value={personaKey}
             onChange={(e) => pickPersona(e.target.value)}
           >
@@ -451,164 +696,39 @@ export default function RidePage() {
         position={position}
         boardingSeq={boardingSeq}
         destinationSeq={destinationSeq}
-        riding={boarded}
-        accuracyM={demoMode ? null : gps.accuracy}
+        riding={false}
+        accuracyM={null}
         waitingEtaLabel={
-          !boarded && eta && eta.etaMinutes.length > 0
+          eta && eta.etaMinutes.length > 0
             ? `🚐 ${eta.etaMinutes[0] <= 0 ? "arriving now" : `${eta.etaMinutes[0]} min`}`
             : null
         }
       />
 
-      {!boarded ? (
-        <button
-          onClick={() => setBoarded(true)}
-          className="rounded-2xl bg-indigo-600 p-4 text-center text-lg font-semibold text-white shadow-lg transition active:scale-95"
-        >
-          🚐 I&apos;m on board — start tracking
-          <span className="block text-sm font-normal opacity-80">
-            waiting at {stops[boardingIdx]?.name.en}
-            {eta && eta.etaMinutes.length > 0 && (
-              <>
-                {" "}
-                · next in{" "}
-                {eta.etaMinutes[0] <= 0 ? "<1" : eta.etaMinutes[0]} min
-              </>
-            )}
-          </span>
-        </button>
-      ) : (
-      <section
-        className={`rounded-2xl p-4 text-center font-semibold ${label.className}`}
-      >
-        <p className="text-lg">{label.text}</p>
-        {status.distanceM !== null && (
-          <p className="mt-1 text-sm font-normal">
-            {Math.round(status.distanceM)} m to {status.destination?.name.en}
-            {status.nearestStop && (
-              <> · near {status.nearestStop.name.en}</>
-            )}
-            {status.destination &&
-              status.nearestStop &&
-              status.destination.seq - status.nearestStop.seq > 0 &&
-              status.state !== "arrived" && (
-                <>
-                  {" "}
-                  ·{" "}
-                  <span className="font-semibold">
-                    {status.destination.seq - status.nearestStop.seq}{" "}
-                    {status.destination.seq - status.nearestStop.seq === 1
-                      ? "stop"
-                      : "stops"}{" "}
-                    to go
-                  </span>
-                </>
-              )}
-          </p>
-        )}
-        {demoMode ? (
-          <p className="mt-1 text-xs font-normal opacity-70">
-            simulated ride · {Math.round(sim.progress * 100)}% of route ·{" "}
-            {SIM_SPEED_KMH} km/h at ×{SIM_TIMELAPSE} time-lapse
-          </p>
-        ) : (
-          <p className="mt-1 text-xs font-normal opacity-70">
-            {gps.position
-              ? `live GPS · ±${Math.round(gps.accuracy ?? 0)} m · screen kept awake`
-              : "waiting for GPS fix…"}
-          </p>
-        )}
-        {status.state === "arrived" && (
-          <button
-            onClick={() => {
-              setBoarded(false);
-              setReachedStop(false);
-              sim.reset();
-            }}
-            className="mt-2 rounded-lg bg-white/70 px-3 py-1 text-sm font-medium"
-          >
-            ↺ New ride
-          </button>
-        )}
-      </section>
-      )}
-
       <button
-        onClick={() => speak(primaryPhrase)}
-        className={`rounded-3xl p-6 text-center shadow-lg transition active:scale-95 ${
-          status.state === "arrive_now" || status.state === "approaching"
-            ? "bg-red-600 text-white"
-            : "bg-slate-900 text-white"
-        } ${speaking === primaryPhrase.id ? "ring-4 ring-amber-400" : ""}`}
+        onClick={() => setBoarded(true)}
+        className="rounded-2xl bg-indigo-600 p-5 text-center text-lg font-semibold text-white shadow-lg transition active:scale-95"
       >
-        <span className="block text-3xl font-bold">
-          {primaryPhrase.cantonese}
-        </span>
-        {coachMode && (
-          <span className="mt-1 block text-sm opacity-80">
-            {primaryPhrase.jyutping}
-          </span>
-        )}
-        <span className="mt-1 block text-sm opacity-80">
-          {primaryPhrase.english} · tap to speak for me
+        🚐 I&apos;m on board — start tracking
+        <span className="mt-0.5 block text-sm font-normal opacity-85">
+          waiting at {stops[boardingIdx]?.name.en}
         </span>
       </button>
 
-      <section className="grid grid-cols-2 gap-2">
-        {otherPhrases.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => speak(p)}
-            className={`rounded-xl border border-slate-200 p-3 text-left text-sm transition active:scale-95 ${
-              speaking === p.id ? "ring-2 ring-amber-400" : ""
-            }`}
-          >
-            <span className="block font-semibold">{p.cantonese}</span>
-            {coachMode && (
-              <span className="block text-xs text-slate-500">{p.jyutping}</span>
-            )}
-            <span className="block text-xs text-slate-500">{p.english}</span>
-          </button>
-        ))}
+      <section>
+        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+          Ask before you board
+        </p>
+        <div className="grid grid-cols-1 gap-2">
+          {boardingPhrases.map((p) => phraseButton(p))}
+        </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 p-4">
-        <button
-          onClick={listenToDriver}
-          disabled={listening}
-          className="w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white transition active:scale-95 disabled:opacity-60"
-        >
-          {listening ? "Listening…" : "🎤 The driver said something"}
-        </button>
-        {listenError && (
-          <p className="mt-2 text-sm text-red-600">{listenError}</p>
-        )}
-        {driverReply && (
-          <div className="mt-3 space-y-2 text-sm">
-            <p className="text-slate-500">Heard: {driverReply.transcript}</p>
-            <p className="font-semibold">{driverReply.english}</p>
-            {driverReply.reply_cantonese && (
-              <button
-                onClick={() =>
-                  speakCantonese(driverReply.reply_cantonese, personaKey)
-                }
-                className="w-full rounded-lg bg-slate-100 p-2 text-left"
-              >
-                <span className="block font-semibold">
-                  Reply: {driverReply.reply_cantonese}
-                </span>
-                <span className="block text-xs text-slate-500">
-                  {driverReply.reply_english} · tap to speak
-                </span>
-              </button>
-            )}
-          </div>
-        )}
-      </section>
+      {micPanel}
 
       <p className="pb-4 text-center text-xs text-slate-400">
         Alert fires {APPROACH_RADIUS_M} m before your stop · phrases spoken in
-        colloquial Cantonese
+        colloquial Cantonese by HKGAI
       </p>
     </main>
   );

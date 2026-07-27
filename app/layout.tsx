@@ -18,6 +18,12 @@ export const metadata: Metadata = {
   description:
     "Situated Cantonese copilot for Hong Kong — never miss your minibus stop again.",
   manifest: "/manifest.json",
+  // Full-screen when installed to the iOS home screen
+  appleWebApp: {
+    capable: true,
+    title: "Yau Lok!",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport = {

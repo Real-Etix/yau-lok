@@ -27,6 +27,10 @@ type Props = {
   waitingEtaLabel?: string | null;
   /** GPS accuracy radius in meters (live mode only) — drawn around the bus */
   accuracyM?: number | null;
+  /** Pulse the destination marker (stop is coming up) */
+  urgent?: boolean;
+  /** Taller map for the riding phase */
+  tall?: boolean;
 };
 
 export default function RideMap({
@@ -38,6 +42,8 @@ export default function RideMap({
   riding,
   waitingEtaLabel,
   accuracyM,
+  urgent,
+  tall,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
@@ -45,6 +51,9 @@ export default function RideMap({
   const busRef = useRef<Marker | null>(null);
   const accuracyRef = useRef<Circle | null>(null);
   const fittedStopsRef = useRef<Stop[] | null>(null);
+  const ridingRef = useRef(riding);
+  ridingRef.current = riding;
+  const zoomedForRideRef = useRef(false);
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
   // Map creation is async (dynamic import) — draw effects wait on this.
   const [ready, setReady] = useState(false);
@@ -72,6 +81,26 @@ export default function RideMap({
     };
   }, []);
 
+  // Leaflet measures the container at init; if the layout settles afterwards
+  // (fonts, flex sizing, phase switch) tiles gray out and fitBounds is wrong.
+  useEffect(() => {
+    if (!ready || !containerRef.current) return;
+    const map = mapRef.current;
+    if (!map) return;
+    map.invalidateSize();
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize();
+      // Don't yank the view back to the whole route while following the bus.
+      if (ridingRef.current) return;
+      const poly = routeLayerRef.current.find(
+        (l) => "getBounds" in l,
+      ) as Polyline | undefined;
+      if (poly) map.fitBounds(poly.getBounds(), { padding: [20, 20] });
+    });
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [ready]);
+
   // (Re)draw route line + stops when the route or picks change.
   useEffect(() => {
     const L = leafletRef.current;
@@ -95,6 +124,7 @@ export default function RideMap({
         fillColor: isBoard ? "#818cf8" : isDest ? "#f87171" : "#ffffff",
         fillOpacity: 1,
         weight: 2,
+        className: isDest && urgent ? "stop-pulse" : undefined,
       });
       if (isBoard && waitingEtaLabel) {
         marker.bindTooltip(waitingEtaLabel, {
@@ -116,7 +146,7 @@ export default function RideMap({
       fittedStopsRef.current = stops;
       map.fitBounds(poly.getBounds(), { padding: [20, 20] });
     }
-  }, [ready, stops, path, boardingSeq, destinationSeq, waitingEtaLabel]);
+  }, [ready, stops, path, boardingSeq, destinationSeq, waitingEtaLabel, urgent]);
 
   // Move the minibus marker; follow it while riding.
   useEffect(() => {
@@ -128,6 +158,7 @@ export default function RideMap({
       busRef.current = null;
       accuracyRef.current?.remove();
       accuracyRef.current = null;
+      zoomedForRideRef.current = false;
       return;
     }
     // GPS accuracy halo (live mode only)
@@ -151,23 +182,32 @@ export default function RideMap({
     if (!busRef.current) {
       busRef.current = L.marker([position.lat, position.lng], {
         icon: L.divIcon({
-          className: "",
-          html: '<div style="font-size:22px;line-height:22px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))">🚐</div>',
-          iconSize: [22, 22],
-          iconAnchor: [11, 11],
+          className: "bus-marker",
+          html: '<div style="font-size:26px;line-height:26px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.45))">🚐</div>',
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
         }),
         zIndexOffset: 1000,
       }).addTo(map);
     } else {
       busRef.current.setLatLng([position.lat, position.lng]);
     }
-    map.panTo([position.lat, position.lng], { animate: true });
+    // Boarding zooms in from the route overview to street level once, so the
+    // rider can see the next couple of stops; after that just follow.
+    if (!zoomedForRideRef.current) {
+      zoomedForRideRef.current = true;
+      map.setView([position.lat, position.lng], 15, { animate: true });
+    } else {
+      map.panTo([position.lat, position.lng], { animate: true });
+    }
   }, [ready, position, riding, accuracyM]);
 
   return (
     <div
       ref={containerRef}
-      className="h-56 w-full rounded-2xl border border-slate-200"
+      className={`w-full rounded-2xl border border-slate-200 bg-slate-100 ${
+        tall ? "h-full min-h-40 flex-1" : "h-52"
+      }`}
     />
   );
 }

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#dc2626"/>
+  <!-- minibus body -->
+  <rect x="96" y="168" width="288" height="176" rx="34" fill="#ffffff"/>
+  <!-- windscreen + windows -->
+  <rect x="128" y="200" width="84" height="66" rx="16" fill="#dc2626"/>
+  <rect x="232" y="200" width="60" height="66" rx="14" fill="#dc2626"/>
+  <rect x="312" y="200" width="40" height="66" rx="14" fill="#dc2626"/>
+  <!-- wheels -->
+  <circle cx="164" cy="352" r="34" fill="#ffffff"/>
+  <circle cx="164" cy="352" r="14" fill="#dc2626"/>
+  <circle cx="316" cy="352" r="34" fill="#ffffff"/>
+  <circle cx="316" cy="352" r="14" fill="#dc2626"/>
+  <!-- motion lines (the shout / the go) -->
+  <rect x="396" y="196" width="72" height="26" rx="13" fill="#ffffff" opacity="0.95"/>
+  <rect x="404" y="242" width="64" height="26" rx="13" fill="#ffffff" opacity="0.75"/>
+  <rect x="412" y="288" width="56" height="26" rx="13" fill="#ffffff" opacity="0.55"/>
+</svg>

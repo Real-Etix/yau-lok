@@ -27,11 +27,13 @@ const SCENARIOS = [
 export default function Home() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-6">
-      <header className="pt-8 text-center">
-        <h1 className="text-5xl font-black tracking-tight">有落!</h1>
-        <p className="mt-1 text-xl font-semibold text-slate-700">Yau Lok!</p>
-        <p className="mt-3 text-sm text-slate-500">
-          A situated Cantonese copilot for Hong Kong — it knows where you are,
+      <header className="pt-10 text-center">
+        <p className="text-6xl font-black leading-none tracking-tight text-red-600">
+          有落!
+        </p>
+        <h1 className="mt-2 text-2xl font-bold">Yau Lok!</h1>
+        <p className="mt-3 text-sm leading-relaxed text-slate-600">
+          A situated Cantonese copilot for Hong Kong. It knows where you are,
           speaks up at the right moment, and teaches you the phrase so next
           time you won&apos;t need it.
         </p>
@@ -43,14 +45,15 @@ export default function Home() {
             key={s.title}
             href={s.href}
             aria-disabled={!s.live}
-            className={`flex items-center gap-4 rounded-2xl border border-slate-200 p-4 transition ${
+            tabIndex={s.live ? undefined : -1}
+            className={`flex items-center gap-4 rounded-2xl border p-4 transition ${
               s.live
-                ? "bg-white shadow-sm active:scale-95"
-                : "pointer-events-none opacity-50"
+                ? "border-slate-200 bg-white shadow-sm active:scale-95"
+                : "pointer-events-none border-slate-200/70 bg-white/50 opacity-60"
             }`}
           >
             <span className="text-3xl">{s.emoji}</span>
-            <span>
+            <span className="min-w-0">
               <span className="block font-semibold">
                 {s.title}
                 {!s.live && (
@@ -61,13 +64,26 @@ export default function Home() {
               </span>
               <span className="block text-sm text-slate-500">{s.subtitle}</span>
             </span>
+            {s.live && (
+              <span className="ml-auto text-xl text-slate-300">›</span>
+            )}
           </Link>
         ))}
       </section>
 
-      <footer className="mt-auto pb-4 text-center text-xs text-slate-400">
-        Powered by HKGAI Studio (Modelhub · Toolhub · Agenthub) + HK open
-        government transport data
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
+        <p className="font-semibold">Why not just a translator?</p>
+        <p className="mt-1 leading-relaxed text-slate-600">
+          Translators answer when you ask. Yau Lok knows{" "}
+          <span className="font-medium text-slate-900">when</span> to speak —
+          it tracks the route, alerts you before your stop, and shouts in
+          colloquial Cantonese so the driver actually stops.
+        </p>
+      </section>
+
+      <footer className="mt-auto pb-4 text-center text-xs leading-relaxed text-slate-400">
+        Cantonese speech &amp; translation by HKGAI Modelhub · routes and live
+        arrivals via HKGAI Toolhub &amp; HK open government data
       </footer>
     </main>
   );
