@@ -25,7 +25,11 @@ moment. The app:
    in your chosen **voice persona** (6 HKGAI Cantonese voices, incl.
    tts-v2's 暖心師奶 / 金牌阿Sir presets; all phrases pre-rendered per voice)
 5. **Listens to the driver** and translates the reply, suggesting a response
-6. **Coaches** — Jyutping shown on every phrase so you learn to shout it yourself
+6. **Says anything** — type any sentence in English and HKGAI rewrites it as
+   colloquial Cantonese (with Jyutping, a back-translation, and a politeness
+   note), then speaks it aloud. The phrase pack covers predictable moments;
+   this covers the rest.
+7. **Coaches** — Jyutping shown on every phrase so you learn to shout it yourself
 
 ## Run it
 
@@ -53,6 +57,9 @@ Phone PWA (Next.js 16, app router)
    │     └─ /api/gmb proxy → data.etagmb.gov.hk (gov open data, fallback)
    ├─ /api/chat → HKGAI Modelhub chat (t2_hkgai-v3_fp8_1m_e7) ✅ LIVE
    │    driver-reply translation + suggested colloquial response
+   ├─ /api/say  → HKGAI Modelhub chat ✅ LIVE
+   │    free text → spoken Cantonese + jyutping + back-translation + tip,
+   │    piped straight into /api/tts (the "AI keyboard" for the street)
    ├─ /api/tts  → HKGAI openspeech tts-v1 Cantonese ✅ LIVE
    │    POST {host}/server_proxy/api/v1/audio/speech → WAV
    │    (browser zh-HK voice as automatic fallback)

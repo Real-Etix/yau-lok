@@ -45,6 +45,13 @@ type DriverReply = {
   reply_english: string;
 };
 
+type SayResult = {
+  cantonese: string;
+  jyutping: string;
+  english: string;
+  note?: string;
+};
+
 // Demo mode drives a simulated position along the stop polyline, so the
 // full journey can be shown indoors at pitch time. The bus moves at a
 // realistic urban minibus speed, played back as a labelled time-lapse
@@ -53,18 +60,18 @@ type DriverReply = {
 export const SIM_SPEED_KMH = 20;
 export const SIM_TIMELAPSE = 12;
 
-function useSimulatedRide(active: boolean, stops: Stop[]) {
+function useSimulatedRide(active: boolean, path: LatLng[]) {
   const [progress, setProgress] = useState(0); // 0..1 across whole route
   const startRef = useRef<number | null>(null);
 
-  // Cumulative distance along the stop polyline.
+  // Cumulative distance along the polyline the bus actually drives.
   const geom = useMemo(() => {
     const cum: number[] = [0];
-    for (let i = 1; i < stops.length; i++) {
-      cum.push(cum[i - 1] + haversineMeters(stops[i - 1], stops[i]));
+    for (let i = 1; i < path.length; i++) {
+      cum.push(cum[i - 1] + haversineMeters(path[i - 1], path[i]));
     }
     return { cum, total: cum[cum.length - 1] ?? 0 };
-  }, [stops]);
+  }, [path]);
   const durationMs = Math.max(
     10_000,
     (geom.total / ((SIM_SPEED_KMH / 3.6) * SIM_TIMELAPSE)) * 1000,
@@ -86,13 +93,13 @@ function useSimulatedRide(active: boolean, stops: Stop[]) {
   }, [active, durationMs]);
 
   const position: LatLng | null =
-    active && stops.length >= 2 && geom.total > 0
+    active && path.length >= 2 && geom.total > 0
       ? (() => {
           const d = progress * geom.total;
           let i = 0;
-          while (i < stops.length - 2 && geom.cum[i + 1] < d) i++;
+          while (i < path.length - 2 && geom.cum[i + 1] < d) i++;
           const segLen = geom.cum[i + 1] - geom.cum[i] || 1;
-          return lerp(stops[i], stops[i + 1], (d - geom.cum[i]) / segLen);
+          return lerp(path[i], path[i + 1], (d - geom.cum[i]) / segLen);
         })()
       : null;
 
@@ -130,6 +137,12 @@ export default function RidePage() {
   const [coachMode, setCoachMode] = useState(true);
   const [speaking, setSpeaking] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
+  // "Say anything": free text → HKGAI Cantonese → HKGAI speech
+  const [sayText, setSayText] = useState("");
+  const [sayResult, setSayResult] = useState<SayResult | null>(null);
+  const [sayLoading, setSayLoading] = useState(false);
+  const [sayError, setSayError] = useState<string | null>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [driverReply, setDriverReply] = useState<DriverReply | null>(null);
   const [listenError, setListenError] = useState<string | null>(null);
 
@@ -171,9 +184,30 @@ export default function RidePage() {
     0,
     stops.findIndex((s) => s.seq === boardingSeq),
   );
-  const simStops = stops.slice(boardingIdx);
+  // Drive the simulation along the real road polyline from the boarding stop
+  // onward — interpolating between stops would cut corners across buildings.
+  const ridePath = useMemo<LatLng[]>(() => {
+    const board = stops[boardingIdx];
+    if (!board) return [];
+    if (routePath.length >= 2) {
+      let nearest = 0;
+      let nearestD = Infinity;
+      routePath.forEach(([lat, lng], i) => {
+        const d = haversineMeters({ lat, lng }, board);
+        if (d < nearestD) {
+          nearestD = d;
+          nearest = i;
+        }
+      });
+      const sliced = routePath.slice(nearest);
+      if (sliced.length >= 2) return sliced.map(([lat, lng]) => ({ lat, lng }));
+    }
+    // Fallback: straight lines between stops (OSRM unavailable)
+    return stops.slice(boardingIdx).map((s) => ({ lat: s.lat, lng: s.lng }));
+  }, [routePath, stops, boardingIdx]);
+
   // The (simulated) ride only moves once the user says they're on board.
-  const sim = useSimulatedRide(demoMode && boarded, simStops);
+  const sim = useSimulatedRide(demoMode && boarded, ridePath);
   const gps = useGeolocation(!demoMode);
   const position = demoMode
     ? (sim.position ?? stops[boardingIdx] ?? null)
@@ -310,6 +344,31 @@ export default function RidePage() {
     [personaKey],
   );
 
+  // Type anything → HKGAI turns it into colloquial Cantonese → speak it.
+  const sayIt = useCallback(async () => {
+    const text = sayText.trim();
+    if (!text) return;
+    setSayLoading(true);
+    setSayError(null);
+    setSayResult(null);
+    try {
+      const res = await fetch("/api/say", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "could not translate");
+      setSayResult(data);
+      // Speak immediately — that's the whole point
+      await speakCantonese(data.cantonese, personaKey);
+    } catch (e) {
+      setSayError(e instanceof Error ? e.message : "Could not translate");
+    } finally {
+      setSayLoading(false);
+    }
+  }, [sayText, personaKey]);
+
   const listenToDriver = useCallback(async () => {
     setListening(true);
     setListenError(null);
@@ -363,6 +422,56 @@ export default function RidePage() {
       )}
       <span className="block text-xs text-slate-500">{p.english}</span>
     </button>
+  );
+
+  const composer = (
+    <section className="rounded-2xl border border-slate-200 bg-white p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        Say anything · AI
+      </p>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Type in English — HKGAI turns it into what a local would actually say,
+        then speaks it out loud.
+      </p>
+      <div className="mt-2 flex gap-2">
+        <input
+          className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2.5 text-base"
+          placeholder="e.g. stop after the temple, I have a big suitcase"
+          value={sayText}
+          onChange={(e) => setSayText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && sayIt()}
+        />
+        <button
+          onClick={sayIt}
+          disabled={sayLoading || !sayText.trim()}
+          className="rounded-lg bg-slate-900 px-4 text-sm font-medium text-white disabled:opacity-40"
+        >
+          {sayLoading ? "…" : "Say it"}
+        </button>
+      </div>
+      {sayError && <p className="mt-2 text-sm text-red-600">{sayError}</p>}
+      {sayResult && (
+        <button
+          onClick={() => speakCantonese(sayResult.cantonese, personaKey)}
+          className="mt-2 w-full rounded-xl bg-slate-900 p-3 text-center text-white transition active:scale-95"
+        >
+          <span className="block text-2xl font-bold">
+            {sayResult.cantonese}
+          </span>
+          {coachMode && (
+            <span className="mt-0.5 block text-xs opacity-80">
+              {sayResult.jyutping}
+            </span>
+          )}
+          <span className="mt-0.5 block text-xs opacity-80">
+            {sayResult.english} · tap to repeat
+          </span>
+        </button>
+      )}
+      {sayResult?.note && (
+        <p className="mt-1.5 text-xs text-slate-500">💡 {sayResult.note}</p>
+      )}
+    </section>
   );
 
   const micPanel = (
@@ -532,6 +641,19 @@ export default function RidePage() {
           <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 pb-1">
             {ridingPhrases.map((p) => phraseButton(p, true))}
             <button
+              onClick={() => setComposerOpen((o) => !o)}
+              className={`min-w-[10.5rem] shrink-0 rounded-xl p-3 text-left text-sm font-semibold transition active:scale-95 ${
+                composerOpen
+                  ? "bg-slate-900 text-white"
+                  : "border border-slate-200 bg-white"
+              }`}
+            >
+              ✍️ Say something else
+              <span className="mt-0.5 block text-xs font-normal opacity-70">
+                type it, AI speaks it
+              </span>
+            </button>
+            <button
               onClick={listenToDriver}
               disabled={listening}
               className="min-w-[10.5rem] shrink-0 rounded-xl bg-indigo-600 p-3 text-left text-sm font-semibold text-white transition active:scale-95 disabled:opacity-60"
@@ -539,6 +661,7 @@ export default function RidePage() {
               {listening ? "Listening…" : "🎤 Driver said something"}
             </button>
           </div>
+          {composerOpen && composer}
           {driverReply && (
             <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
               <p className="font-semibold">{driverReply.english}</p>
@@ -723,6 +846,8 @@ export default function RidePage() {
           {boardingPhrases.map((p) => phraseButton(p))}
         </div>
       </section>
+
+      {composer}
 
       {micPanel}
 
