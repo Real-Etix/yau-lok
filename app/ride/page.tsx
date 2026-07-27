@@ -9,7 +9,9 @@ import {
   useRideTracker,
   APPROACH_RADIUS_M,
   type RideState,
+  type Stop,
 } from "@/hooks/useRideTracker";
+import { getBusRoute } from "@/lib/toolhub";
 import { lerp, type LatLng } from "@/lib/geo";
 import { listenCantonese, speakCantonese } from "@/lib/speech";
 
@@ -42,7 +44,7 @@ type DriverReply = {
 // can't stall the ride mid-demo.
 const SIM_RIDE_DURATION_MS = 60_000;
 
-function useSimulatedRide(active: boolean) {
+function useSimulatedRide(active: boolean, stops: Stop[]) {
   const [progress, setProgress] = useState(0); // 0..1 across whole route
   const startRef = useRef<number | null>(null);
   useEffect(() => {
@@ -58,14 +60,15 @@ function useSimulatedRide(active: boolean) {
     return () => clearInterval(id);
   }, [active]);
 
-  const position: LatLng | null = active
-    ? (() => {
-        const segs = DEMO_STOPS.length - 1;
-        const x = progress * segs;
-        const i = Math.min(Math.floor(x), segs - 1);
-        return lerp(DEMO_STOPS[i], DEMO_STOPS[i + 1], x - i);
-      })()
-    : null;
+  const position: LatLng | null =
+    active && stops.length >= 2
+      ? (() => {
+          const segs = stops.length - 1;
+          const x = progress * segs;
+          const i = Math.min(Math.floor(x), segs - 1);
+          return lerp(stops[i], stops[i + 1], x - i);
+        })()
+      : null;
 
   return {
     position,
@@ -86,11 +89,39 @@ export default function RidePage() {
   const [driverReply, setDriverReply] = useState<DriverReply | null>(null);
   const [listenError, setListenError] = useState<string | null>(null);
 
-  const sim = useSimulatedRide(demoMode);
+  // Route: bundled demo stops by default; a real route via HKGAI Toolhub
+  // once loaded (transit_route_detail tool).
+  const [stops, setStops] = useState<Stop[]>(DEMO_STOPS);
+  const [routeName, setRouteName] = useState(DEMO_ROUTE_NAME);
+  const [routeCode, setRouteCode] = useState("");
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+
+  const sim = useSimulatedRide(demoMode, stops);
   const gps = useGeolocation(!demoMode);
   const position = demoMode ? sim.position : gps.position;
 
-  const tracked = useRideTracker(DEMO_STOPS, destinationSeq, position);
+  const simReset = sim.reset;
+  const loadRoute = useCallback(async () => {
+    if (!routeCode.trim()) return;
+    setRouteLoading(true);
+    setRouteError(null);
+    try {
+      const r = await getBusRoute(routeCode.trim().toUpperCase());
+      setStops(r.stops);
+      setRouteName(
+        `GMB ${r.routeCode} · ${r.origEn} → ${r.destEn} (live via Toolhub)`,
+      );
+      setDestinationSeq(r.stops[r.stops.length - 1].seq);
+      simReset();
+    } catch (e) {
+      setRouteError(e instanceof Error ? e.message : "Could not load route");
+    } finally {
+      setRouteLoading(false);
+    }
+  }, [routeCode, simReset]);
+
+  const tracked = useRideTracker(stops, destinationSeq, position);
 
   // Latch "arrived": once we've been at the stop and are moving away
   // again, the ride is over — don't fall back to "coming up".
@@ -98,7 +129,7 @@ export default function RidePage() {
   useEffect(() => {
     if (tracked.state === "arrive_now") setReachedStop(true);
   }, [tracked.state]);
-  useEffect(() => setReachedStop(false), [destinationSeq, demoMode]);
+  useEffect(() => setReachedStop(false), [destinationSeq, demoMode, stops]);
   const status =
     reachedStop && tracked.state !== "arrive_now"
       ? { ...tracked, state: "arrived" as const }
@@ -180,8 +211,27 @@ export default function RidePage() {
 
       <section className="rounded-2xl border border-slate-200 p-4">
         <p className="text-xs uppercase tracking-wide text-slate-500">
-          {DEMO_ROUTE_NAME}
+          {routeName}
         </p>
+        <div className="mt-2 flex gap-2">
+          <input
+            className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2 text-sm"
+            placeholder="GMB route code, e.g. 5"
+            value={routeCode}
+            onChange={(e) => setRouteCode(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && loadRoute()}
+          />
+          <button
+            onClick={loadRoute}
+            disabled={routeLoading || !routeCode.trim()}
+            className="rounded-lg bg-slate-900 px-3 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {routeLoading ? "Loading…" : "Load route"}
+          </button>
+        </div>
+        {routeError && (
+          <p className="mt-1 text-sm text-red-600">{routeError}</p>
+        )}
         <label className="mt-2 block text-sm">
           Get off at
           <select
@@ -189,7 +239,7 @@ export default function RidePage() {
             value={destinationSeq ?? ""}
             onChange={(e) => setDestinationSeq(Number(e.target.value))}
           >
-            {DEMO_STOPS.map((s) => (
+            {stops.map((s) => (
               <option key={s.seq} value={s.seq}>
                 {s.name.en} · {s.name.tc}
               </option>

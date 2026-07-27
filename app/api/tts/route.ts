@@ -1,11 +1,10 @@
-// HKGAI Modelhub speech synthesis proxy.
-//
-// TODO(hackathon, day 1): fill in the real Modelhub speech endpoint + payload
-// from HKGAI Studio docs, then set HKGAI_SPEECH_URL / HKGAI_SPEECH_TOKEN in
-// .env.local. Until then this returns 501 and the client falls back to the
-// browser's zh-HK speechSynthesis voice, so the demo still works.
+// HKGAI speech TTS proxy.
+// Docs: Studio → Modelhub → Speech. Endpoint:
+//   POST {HKGAI_SPEECH_URL}/server_proxy/api/v1/audio/speech
+// Returns a WAV file; JSON on error. Falls back to 501 (browser TTS)
+// when credentials are missing.
 
-const SPEECH_URL = process.env.HKGAI_SPEECH_URL;
+const SPEECH_HOST = process.env.HKGAI_SPEECH_URL; // e.g. https://openspeech.hkgai.net
 const SPEECH_TOKEN = process.env.HKGAI_SPEECH_TOKEN;
 
 export async function POST(request: Request) {
@@ -14,29 +13,40 @@ export async function POST(request: Request) {
     return Response.json({ error: "text required" }, { status: 400 });
   }
 
-  if (!SPEECH_URL || !SPEECH_TOKEN) {
+  if (!SPEECH_HOST || !SPEECH_TOKEN) {
     return Response.json(
       { error: "HKGAI speech not configured; use browser TTS fallback" },
       { status: 501 },
     );
   }
 
-  const res = await fetch(SPEECH_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${SPEECH_TOKEN}`,
+  const res = await fetch(
+    `${SPEECH_HOST.replace(/\/+$/, "")}/server_proxy/api/v1/audio/speech`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${SPEECH_TOKEN}`,
+      },
+      body: JSON.stringify({
+        model_name: "tts-v1",
+        input: text,
+        language: "cantonese",
+        voice: "female",
+        type: "file",
+        response_format: "wav",
+      }),
     },
-    // Adjust payload to match Modelhub's speech API spec.
-    body: JSON.stringify({ input: text, voice: "cantonese", format: "mp3" }),
-  });
-  if (!res.ok) {
+  );
+  const contentType = res.headers.get("Content-Type") ?? "";
+  if (!res.ok || contentType.includes("json")) {
+    const detail = await res.text();
     return Response.json(
-      { error: `HKGAI speech failed: ${res.status}` },
+      { error: `HKGAI speech failed: ${res.status} ${detail.slice(0, 300)}` },
       { status: 502 },
     );
   }
   return new Response(res.body, {
-    headers: { "Content-Type": res.headers.get("Content-Type") ?? "audio/mpeg" },
+    headers: { "Content-Type": contentType || "audio/wav" },
   });
 }

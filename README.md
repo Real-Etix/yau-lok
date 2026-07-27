@@ -34,27 +34,36 @@ Everything degrades gracefully before keys are set: TTS falls back to the
 browser's zh-HK voice, and translation returns a stub. So the UI is fully
 demoable from minute zero.
 
-## Architecture
+## Architecture (all HKGAI endpoints live)
 
 ```
 Phone PWA (Next.js 16, app router)
-   ├─ Context engine (ours): GPS × GMB route → approach/arrive triggers
-   │     └─ data: /api/gmb proxy → data.etagmb.gov.hk (HK gov open data)
-   │        TODO: switch to HKGAI Toolhub (MCP) if it exposes transit data
-   ├─ /api/chat  → HKGAI Modelhub (OpenAI-compatible) — driver-reply translation
-   ├─ /api/tts   → HKGAI Modelhub speech (falls back to browser zh-HK voice)
+   ├─ Context engine (ours): GPS × route stops → approach/arrive triggers
+   │     ├─ /api/toolhub proxy → HKGAI Toolhub REST ✅ LIVE
+   │     │    transit_route_detail: type a GMB code, get real stops+coords
+   │     └─ /api/gmb proxy → data.etagmb.gov.hk (gov open data, fallback)
+   ├─ /api/chat → HKGAI Modelhub chat (t2_hkgai-v3_fp8_1m_e7) ✅ LIVE
+   │    driver-reply translation + suggested colloquial response
+   ├─ /api/tts  → HKGAI openspeech tts-v1 Cantonese ✅ LIVE
+   │    POST {host}/server_proxy/api/v1/audio/speech → WAV
+   │    (browser zh-HK voice as automatic fallback)
+   ├─ /api/asr  → HKGAI speech_recognize proxy (wired; client still uses
+   │    browser SpeechRecognition — see TODO in app/api/asr/route.ts)
    └─ Coach layer: phrase pack with Jyutping (data/phrases.ts)
 ```
 
-## Day-1 checklist (before building more UI)
+Toolhub also exposes transit ETA/fares, geo search, weather, parking, and
+A&E waiting times — same `/api/toolhub/<tool-path>` proxy reaches all of
+them (base https://toolhub.prod.hkchat.app/v1, App-Name/App-Key headers).
 
-- [ ] Fill in Modelhub speech endpoint in `app/api/tts/route.ts` (see TODO)
-- [ ] Test Cantonese TTS latency — if > ~2 s, pre-generate the 7 core phrases
-      as cached audio files at build time
-- [ ] Test ASR on noisy colloquial Cantonese (minibus engine background)
-- [ ] Check whether Toolhub exposes GMB routes/ETA — swap `lib/gmb.ts` if so
-- [ ] Replace `data/demo-route.ts` with a real route fetched via `lib/gmb.ts`
-      (e.g. `getRouteIds("HKI", "5")` → `getRouteStops(id, 1)`)
+## Remaining team TODOs
+
+- [ ] Switch `listenCantonese()` in `lib/speech.ts` to MediaRecorder +
+      `/api/asr` (HKGAI Cantonese ASR) instead of browser SpeechRecognition
+- [ ] Measure TTS latency on venue Wi-Fi; pre-generate the 7 core phrases as
+      cached audio if slow
+- [ ] Wire `transit_eta` (Toolhub) into the status card ("next minibus in 4 min")
+- [ ] Try `tts-v2` / male voice; pick what sounds most natural shouted
 
 ## Judging-criteria mapping
 

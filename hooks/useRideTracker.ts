@@ -2,7 +2,14 @@
 
 import { useMemo } from "react";
 import { haversineMeters, type LatLng } from "@/lib/geo";
-import type { GmbStop } from "@/lib/gmb";
+
+/** Minimal stop shape the tracker needs — GMB and Toolhub stops both fit. */
+export type Stop = {
+  seq: number;
+  name: { en: string; tc: string };
+  lat: number;
+  lng: number;
+};
 
 export type RideState = "riding" | "approaching" | "arrive_now" | "arrived";
 
@@ -13,13 +20,13 @@ export type RideStatus = {
   state: RideState;
   /** Meters from current position to the destination stop */
   distanceM: number | null;
-  destination: GmbStop | null;
+  destination: Stop | null;
   /** Nearest stop to the current position (for the "you are here" line) */
-  nearestStop: GmbStop | null;
+  nearestStop: Stop | null;
 };
 
 export function useRideTracker(
-  stops: GmbStop[],
+  stops: Stop[],
   destinationSeq: number | null,
   position: LatLng | null,
 ): RideStatus {
@@ -31,7 +38,7 @@ export function useRideTracker(
     }
 
     const distanceM = haversineMeters(position, destination);
-    let nearestStop: GmbStop | null = null;
+    let nearestStop: Stop | null = null;
     let nearestD = Infinity;
     for (const s of stops) {
       const d = haversineMeters(position, s);
