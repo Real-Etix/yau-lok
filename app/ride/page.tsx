@@ -14,9 +14,13 @@ import {
 import {
   getBusRoute,
   getRoadShape,
+  getFacilities,
   getRouteEta,
   getStopFare,
+  getWeather,
   loadRouteForLeg,
+  type Facility,
+  type WeatherNow,
   planJourney,
   sortMinibusFirst,
   type JourneyLeg,
@@ -58,12 +62,13 @@ type DriverReply = {
   reply_english: string;
 };
 
-type ToolId = "phrases" | "say" | "listen" | "voice";
+type ToolId = "phrases" | "say" | "listen" | "nearby" | "voice";
 
 const TOOLS: { id: ToolId; label: string }[] = [
   { id: "phrases", label: "🗣️ Ask the driver" },
   { id: "say", label: "✍️ Say anything · AI" },
   { id: "listen", label: "🎤 Listen" },
+  { id: "nearby", label: "🚻 Nearby" },
   { id: "voice", label: "🔊 Voice" },
 ];
 
@@ -193,6 +198,12 @@ export default function RidePage() {
   const [planError, setPlanError] = useState<string | null>(null);
   const [showRouteCode, setShowRouteCode] = useState(false);
   const [fare, setFare] = useState<number | null>(null);
+  const [weather, setWeather] = useState<WeatherNow | null>(null);
+  const [facilities, setFacilities] = useState<Facility[] | null>(null);
+  const [facilityType, setFacilityType] = useState<"toilet" | "market">(
+    "toilet",
+  );
+  const [facilitiesLoading, setFacilitiesLoading] = useState(false);
 
   // Trace the real road shape for whatever stops are loaded (Toolhub only
   // has stop-to-stop fallback lines for GMB). Toolhub/straight lines remain
@@ -357,6 +368,46 @@ export default function RidePage() {
       cancelled = true;
     };
   }, [routeRef, stops, boardingSeq, destinationSeq]);
+
+  // Weather at the boarding stop — waiting for a minibus in the rain is
+  // the difference between a fine trip and a miserable one.
+  useEffect(() => {
+    const on = stops.find((s) => s.seq === boardingSeq);
+    if (!on) return;
+    let cancelled = false;
+    // Try the route's origin district and the stop's leading words — full
+    // stop names ("… Public Transport Interchange") don't geocode.
+    const words = on.name.en.split(/[,(]/)[0].split(/\s+/);
+    getWeather(
+      routeName.match(/·\s*([^→(]+)/)?.[1]?.trim() ?? "",
+      words.slice(0, 3).join(" "),
+      words.slice(0, 2).join(" "),
+      "Hong Kong",
+    )
+      .then((w) => {
+        if (!cancelled) setWeather(w);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [stops, boardingSeq, routeName]);
+
+  const loadFacilities = useCallback(
+    async (type: "toilet" | "market") => {
+      const anchor =
+        position ?? stops.find((s) => s.seq === boardingSeq) ?? stops[0];
+      if (!anchor) return;
+      setFacilityType(type);
+      setFacilitiesLoading(true);
+      try {
+        setFacilities(await getFacilities(type, anchor.lat, anchor.lng));
+      } finally {
+        setFacilitiesLoading(false);
+      }
+    },
+    [position, stops, boardingSeq],
+  );
 
   const tracked = useRideTracker(
     stops,
@@ -1114,6 +1165,25 @@ export default function RidePage() {
         }
       />
 
+      {weather && (
+        <p
+          className={`rounded-xl p-2.5 text-sm ${
+            weather.wet
+              ? "border border-sky-200 bg-sky-50 text-sky-900"
+              : "bg-slate-100 text-slate-600"
+          }`}
+        >
+          {weather.wet ? "☔️" : "🌤"} {weather.text}
+          {weather.temperature !== null && `, ${Math.round(weather.temperature)}°C`}
+          {weather.station && ` at ${weather.station}`}
+          {weather.wet && (
+            <span className="mt-0.5 block text-xs">
+              Bring an umbrella — you&apos;ll be waiting at the kerb.
+            </span>
+          )}
+        </p>
+      )}
+
       <button
         onClick={() => setBoarded(true)}
         className="rounded-2xl bg-indigo-600 p-5 text-center text-lg font-semibold text-white shadow-lg transition active:scale-95"
@@ -1152,6 +1222,51 @@ export default function RidePage() {
           )}
           {activeTool === "say" && composer}
           {activeTool === "listen" && micPanel}
+          {activeTool === "nearby" && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-3">
+              <div className="flex gap-2">
+                {(["toilet", "market"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => loadFacilities(t)}
+                    className={`flex-1 rounded-lg py-2 text-sm font-medium transition active:scale-95 ${
+                      facilities && facilityType === t
+                        ? "bg-slate-900 text-white"
+                        : "border border-slate-200"
+                    }`}
+                  >
+                    {t === "toilet" ? "🚻 Public toilets" : "🧺 Markets"}
+                  </button>
+                ))}
+              </div>
+              {facilitiesLoading && (
+                <div className="mt-2 h-12 animate-pulse rounded-lg bg-slate-100" />
+              )}
+              {facilities && !facilitiesLoading && (
+                <ul className="mt-2 space-y-1 text-sm">
+                  {facilities.length === 0 && (
+                    <li className="text-slate-500">None found nearby.</li>
+                  )}
+                  {facilities.slice(0, 5).map((f, i) => (
+                    <li
+                      key={i}
+                      className="flex justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1.5"
+                    >
+                      <span className="min-w-0 truncate">{f.name}</span>
+                      {f.distanceM !== null && (
+                        <span className="shrink-0 text-xs text-slate-500">
+                          {f.distanceM} m
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-1.5 text-xs text-slate-500">
+                Government facility data via HKGAI Toolhub.
+              </p>
+            </section>
+          )}
           {activeTool === "voice" && (
             <section className="rounded-2xl border border-slate-200 bg-white p-3">
               <SelectField

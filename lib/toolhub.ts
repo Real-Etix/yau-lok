@@ -182,6 +182,88 @@ export async function getStopFare(
   }
 }
 
+export type WeatherNow = {
+  text: string;
+  temperature: number | null;
+  humidity: number | null;
+  station: string | null;
+  /** true when the conditions suggest taking an umbrella */
+  wet: boolean;
+};
+
+/**
+ * Current conditions near a place (Toolhub weather_query, HKO-sourced).
+ * The tool geocodes a place NAME and rejects lat/lng, and full bus-stop
+ * names like "Shek Pai Wan Estate Public Transport Interchange" fail to
+ * geocode — so we retry with progressively shorter district-ish names.
+ */
+export async function getWeather(
+  ...candidates: string[]
+): Promise<WeatherNow | null> {
+  for (const location of candidates) {
+    if (!location) continue;
+    const w = await weatherFor(location);
+    if (w) return w;
+  }
+  return null;
+}
+
+async function weatherFor(location: string): Promise<WeatherNow | null> {
+  try {
+    const res = await fetch("/api/toolhub/weather", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ location }),
+    });
+    const body = await res.json();
+    const c = body?.data?.current;
+    if (!c) return null;
+    // text_en is frequently null in this feed; text_tc always populated.
+    const text: string = c.text_tc || c.text_en || "";
+    return {
+      text,
+      temperature: typeof c.temperature === "number" ? c.temperature : null,
+      humidity: typeof c.humidity === "number" ? c.humidity : null,
+      station: c.station_en || c.station_tc || null,
+      wet: /雨|雷|storm|rain|shower|thunder/i.test(text),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export type Facility = {
+  name: string;
+  distanceM: number | null;
+};
+
+/** Nearby public toilets or markets (Toolhub facility_search). */
+export async function getFacilities(
+  type: "toilet" | "market",
+  lat: number,
+  lng: number,
+): Promise<Facility[]> {
+  try {
+    const res = await fetch("/api/toolhub/facilities/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lat, lng, facility_type: type }),
+    });
+    const body = await res.json();
+    type Raw = {
+      name_en: string | null;
+      name_tc: string | null;
+      distance_meters: number | null;
+    };
+    return ((body?.data?.results ?? []) as Raw[]).map((f) => ({
+      name: f.name_en || f.name_tc || "Unnamed",
+      distanceM: f.distance_meters ?? null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export type RouteEta = {
   stopNameEn: string;
   stopNameTc: string;
