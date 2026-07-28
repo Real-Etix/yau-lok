@@ -74,6 +74,19 @@ Toolhub also exposes transit ETA/fares, geo search, weather, parking, and
 A&E waiting times — same `/api/toolhub/<tool-path>` proxy reaches all of
 them (base https://toolhub.prod.hkchat.app/v1, App-Name/App-Key headers).
 
+## Yau Lok as an MCP server
+
+Other HKGAI agents can call this app: `POST /api/mcp` speaks JSON-RPC 2.0
+(MCP Streamable HTTP) and offers two tools —
+
+- `plan_minibus_journey` — origin + destination → options ranked minibus
+  first, with fare and route code
+- `minibus_alight_plan` — route + destination stop → stop sequence, the
+  distances at which to get ready and call out, and the Cantonese to shout
+
+Toolhub gives agents Hong Kong's *data*; this gives them the *behaviour*
+built on top of it.
+
 ## Toolhub tools in use
 
 - `transit_route_detail` — route-code input → real stops + coordinates
@@ -81,6 +94,20 @@ them (base https://toolhub.prod.hkchat.app/v1, App-Name/App-Key headers).
   refreshed every 30 s (matches by route_id, falls back to code+operator;
   empty outside service hours)
 - `transit_route_search` — validated, available for a route-picker UI
+- `transport_route` — destination-first planning: name a place, get ranked
+  journeys with fares (minibus options sorted to the top)
+- `transit_fare` — exact stop-to-stop fare. Resolves stops by **name**;
+  stop ids and sequence numbers are both rejected
+- `weather` (path `/v1/weather`) — umbrella warning while you wait. Geocodes
+  a place **name** and rejects lat/lng; full stop names often fail to
+  geocode, so we retry progressively shorter ones
+- `facilities/search` — nearby public toilets and markets (`facility_type`
+  is `toilet` or `market`)
+- `healthcare/ae-wait` — live A&E waiting times, powering the clinic pack
+
+Agenthub (`search-agent.prod.hkchat.app/v1/tool/search-agent`) answers what
+the structured feeds can't — service hours, last departures — summarised
+through Modelhub. Sources are filtered to official/transport domains.
 
 ## Done (was the TODO list)
 
