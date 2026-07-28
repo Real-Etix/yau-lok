@@ -15,8 +15,10 @@ import {
   getBusRoute,
   getRoadShape,
   getRouteEta,
+  getStopFare,
   loadRouteForLeg,
   planJourney,
+  sortMinibusFirst,
   type JourneyLeg,
   type JourneyOption,
   type RouteEta,
@@ -190,6 +192,7 @@ export default function RidePage() {
   const [planOptions, setPlanOptions] = useState<JourneyOption[] | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
   const [showRouteCode, setShowRouteCode] = useState(false);
+  const [fare, setFare] = useState<number | null>(null);
 
   // Trace the real road shape for whatever stops are loaded (Toolhub only
   // has stop-to-stop fallback lines for GMB). Toolhub/straight lines remain
@@ -292,7 +295,9 @@ export default function RidePage() {
           : gps.position
             ? { lat: gps.position.lat, lng: gps.position.lng }
             : { name: stops[0]?.name.en };
-      const options = await planJourney(origin, { name: destQuery.trim() });
+      const options = sortMinibusFirst(await planJourney(origin, {
+        name: destQuery.trim(),
+      }));
       setPlanOptions(options.slice(0, 4));
       if (options.length === 0) setPlanError("No routes found for that trip.");
     } catch (e) {
@@ -334,6 +339,24 @@ export default function RidePage() {
     },
     [simReset],
   );
+
+  // Exact fare for the chosen stop pair — minibuses are cash-heavy and
+  // drivers rarely make change, so knowing the amount beforehand matters.
+  useEffect(() => {
+    if (!routeRef) return;
+    const on = stops.find((s) => s.seq === boardingSeq);
+    const off = stops.find((s) => s.seq === destinationSeq);
+    if (!on || !off) return;
+    let cancelled = false;
+    getStopFare(routeRef.routeCode, routeRef.company, on.name.tc, off.name.tc)
+      .then((f) => {
+        if (!cancelled) setFare(f);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [routeRef, stops, boardingSeq, destinationSeq]);
 
   const tracked = useRideTracker(
     stops,
@@ -894,6 +917,14 @@ export default function RidePage() {
           </div>
         )}
 
+        {planOptions &&
+          planOptions.length > 0 &&
+          !planOptions.some((o) => o.hasMinibus) && (
+            <p className="mt-3 rounded-xl bg-amber-50 p-2.5 text-xs text-amber-900">
+              No green minibus on this trip — showing buses instead. Yau Lok
+              still tracks them and shouts for you.
+            </p>
+          )}
         {planOptions && planOptions.length > 0 && (
           <ul className="mt-3 space-y-2">
             {planOptions.map((opt, i) => {
@@ -1041,6 +1072,18 @@ export default function RidePage() {
           accent="red"
           value={destinationSeq ?? ""}
           onChange={(v) => setDestinationSeq(Number(v))}
+          hint={
+            fare !== null ? (
+              <p className="mt-2 rounded-xl border border-amber-100 bg-amber-50 p-2.5 text-sm text-amber-900">
+                💰 Fare <span className="font-semibold">HK${fare.toFixed(1)}</span>{" "}
+                for this trip
+                <span className="mt-0.5 block text-xs text-amber-800">
+                  Minibus drivers rarely give change — have coins or Octopus
+                  ready.
+                </span>
+              </p>
+            ) : null
+          }
         >
           {stops
             .filter((s) => s.seq > boardingSeq)

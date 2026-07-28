@@ -46,6 +46,8 @@ export type JourneyOption = {
   km: number;
   fare: number | null;
   legs: JourneyLeg[];
+  /** Does this option include a green-minibus leg? */
+  hasMinibus: boolean;
 };
 
 export type PlaceRef = { name?: string; lat?: number; lng?: number };
@@ -133,8 +135,51 @@ export async function planJourney(
       km: r.distance_meters / 1000,
       fare: r.fare?.amount ?? null,
       legs,
+      hasMinibus: legs.some((l) => l.company === "gmb"),
     };
   });
+}
+
+/**
+ * Minibus options first — the planner ranks purely on duration, which buries
+ * the mode this app exists for. Within each group, keep the fastest first.
+ */
+export function sortMinibusFirst(options: JourneyOption[]): JourneyOption[] {
+  return [...options].sort((a, b) => {
+    if (a.hasMinibus !== b.hasMinibus) return a.hasMinibus ? -1 : 1;
+    return a.minutes - b.minutes;
+  });
+}
+
+/**
+ * Fare between two stops on a route. Toolhub's fare tool resolves stops by
+ * NAME (ids and sequence numbers are rejected), so pass the stop names.
+ * Returns null when the pair isn't priced rather than throwing — fare is a
+ * nice-to-have and must never block the ride view.
+ */
+export async function getStopFare(
+  route: string,
+  company: string,
+  fromStopName: string,
+  toStopName: string,
+): Promise<number | null> {
+  try {
+    const res = await fetch("/api/toolhub/transport/transit/fare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        route,
+        company,
+        from_stop: fromStopName,
+        to_stop: toStopName,
+      }),
+    });
+    const body = await res.json();
+    const amount = body?.data?.results?.[0]?.fare?.amount;
+    return typeof amount === "number" ? amount : null;
+  } catch {
+    return null;
+  }
 }
 
 export type RouteEta = {
