@@ -204,6 +204,12 @@ export default function RidePage() {
     "toilet",
   );
   const [facilitiesLoading, setFacilitiesLoading] = useState(false);
+  const [serviceInfo, setServiceInfo] = useState<{
+    answer: string;
+    confident?: boolean;
+    sources?: string[];
+  } | null>(null);
+  const [serviceLoading, setServiceLoading] = useState(false);
 
   // Trace the real road shape for whatever stops are loaded (Toolhub only
   // has stop-to-stop fallback lines for GMB). Toolhub/straight lines remain
@@ -408,6 +414,36 @@ export default function RidePage() {
     },
     [position, stops, boardingSeq],
   );
+
+  // No live ETA doesn't mean "service ended" — ask the open web instead of
+  // guessing (Agenthub search + Modelhub summary).
+  const checkService = useCallback(async () => {
+    if (!routeRef) return;
+    setServiceLoading(true);
+    setServiceInfo(null);
+    try {
+      const on = stops.find((s) => s.seq === boardingSeq);
+      const res = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `Hong Kong ${routeRef.company === "gmb" ? "green minibus" : "bus"} route ${routeRef.routeCode}${
+            on ? ` at ${on.name.en}` : ""
+          }: what are the first and last departure times, and is it running today?`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "lookup failed");
+      setServiceInfo(data);
+    } catch (e) {
+      setServiceInfo({
+        answer: e instanceof Error ? e.message : "Could not check service",
+        confident: false,
+      });
+    } finally {
+      setServiceLoading(false);
+    }
+  }, [routeRef, stops, boardingSeq]);
 
   const tracked = useRideTracker(
     stops,
@@ -1103,10 +1139,46 @@ export default function RidePage() {
                 </span>
               </p>
             ) : routeLoaded ? (
-              <p className="mt-2 rounded-xl bg-slate-50 p-2.5 text-xs text-slate-500">
-                No live arrivals right now — service may have ended for today,
-                or this stop has no real-time feed.
-              </p>
+              <div className="mt-2 rounded-xl bg-slate-50 p-2.5 text-xs text-slate-500">
+                No live arrivals at this stop right now.
+                {!serviceInfo && (
+                  <button
+                    onClick={checkService}
+                    disabled={serviceLoading}
+                    className="ml-1 font-semibold text-indigo-600 underline disabled:opacity-50"
+                  >
+                    {serviceLoading
+                      ? "Checking the web…"
+                      : "Is it still running?"}
+                  </button>
+                )}
+                {serviceInfo && (
+                  <span className="mt-1.5 block text-slate-700">
+                    {serviceInfo.confident === false && "⚠️ "}
+                    {serviceInfo.answer}
+                    {serviceInfo.sources && serviceInfo.sources.length > 0 && (
+                      <span className="mt-0.5 block text-slate-400">
+                        source:{" "}
+                        {serviceInfo.sources.map((u, i) => (
+                          <a
+                            key={u}
+                            href={u}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline"
+                          >
+                            {i > 0 && ", "}
+                            {new URL(u).hostname.replace(/^www\./, "")}
+                          </a>
+                        ))}
+                      </span>
+                    )}
+                    <span className="mt-0.5 block text-slate-400">
+                      searched live via HKGAI Agenthub
+                    </span>
+                  </span>
+                )}
+              </div>
             ) : null
           }
         >
