@@ -16,11 +16,11 @@ const SCENARIOS = [
     live: false,
   },
   {
-    href: "#",
+    href: "/clinic",
     emoji: "🏥",
     title: "Clinic & counters",
-    subtitle: "Queue tickets, forms, and turn-taking phrases",
-    live: false,
+    subtitle: "Say what's wrong, and see where the A&E wait is shortest",
+    live: true,
   },
 ];
 

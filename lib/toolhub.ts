@@ -264,6 +264,55 @@ export async function getFacilities(
   }
 }
 
+export type AeHospital = {
+  id: string;
+  name: string;
+  district: string;
+  distanceM: number | null;
+  /** Headline median wait, e.g. "3 hours" */
+  wait: string | null;
+  /** Wait once triaged as urgent, e.g. "22 minutes" */
+  urgentWait: string | null;
+};
+
+/** Live A&E waiting times at public hospitals (Toolhub healthcare_ae_wait). */
+export async function getAeWaits(
+  lat?: number,
+  lng?: number,
+): Promise<AeHospital[]> {
+  try {
+    const res = await fetch("/api/toolhub/healthcare/ae-wait", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(lat != null && lng != null ? { lat, lng } : {}),
+    });
+    const body = await res.json();
+    type Raw = {
+      id: string;
+      name_en: string | null;
+      name_tc: string | null;
+      district_en: string | null;
+      district_tc: string | null;
+      distance_meters: number | null;
+      wait: {
+        headline?: { band_en?: string; band_tc?: string };
+        triage?: { urgent?: { p50_en?: string; p50_tc?: string } };
+      } | null;
+    };
+    return ((body?.data?.results ?? []) as Raw[]).map((h) => ({
+      id: h.id,
+      name: h.name_en || h.name_tc || h.id,
+      district: h.district_en || h.district_tc || "",
+      distanceM: h.distance_meters ?? null,
+      wait: h.wait?.headline?.band_en || h.wait?.headline?.band_tc || null,
+      urgentWait:
+        h.wait?.triage?.urgent?.p50_en || h.wait?.triage?.urgent?.p50_tc || null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export type RouteEta = {
   stopNameEn: string;
   stopNameTc: string;
