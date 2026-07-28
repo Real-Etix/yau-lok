@@ -15,6 +15,10 @@ import {
   getBusRoute,
   getRoadShape,
   getRouteEta,
+  loadRouteForLeg,
+  planJourney,
+  type JourneyLeg,
+  type JourneyOption,
   type RouteEta,
 } from "@/lib/toolhub";
 import { VOICE_PERSONAS, DEFAULT_PERSONA_KEY } from "@/data/voices";
@@ -179,6 +183,14 @@ export default function RidePage() {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [eta, setEta] = useState<RouteEta | null>(null);
 
+  // Destination-first planning: name a place, we work out the minibus.
+  const [destQuery, setDestQuery] = useState("");
+  const [originQuery, setOriginQuery] = useState("");
+  const [planning, setPlanning] = useState(false);
+  const [planOptions, setPlanOptions] = useState<JourneyOption[] | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [showRouteCode, setShowRouteCode] = useState(false);
+
   // Trace the real road shape for whatever stops are loaded (Toolhub only
   // has stop-to-stop fallback lines for GMB). Toolhub/straight lines remain
   // the fallback if OSRM is unreachable.
@@ -268,6 +280,61 @@ export default function RidePage() {
     () => routePath.map(([lat, lng]) => ({ lat, lng })),
     [routePath],
   );
+  const planTrip = useCallback(async () => {
+    if (!destQuery.trim()) return;
+    setPlanning(true);
+    setPlanError(null);
+    setPlanOptions(null);
+    try {
+      const origin =
+        originQuery.trim().length > 0
+          ? { name: originQuery.trim() }
+          : gps.position
+            ? { lat: gps.position.lat, lng: gps.position.lng }
+            : { name: stops[0]?.name.en };
+      const options = await planJourney(origin, { name: destQuery.trim() });
+      setPlanOptions(options.slice(0, 4));
+      if (options.length === 0) setPlanError("No routes found for that trip.");
+    } catch (e) {
+      setPlanError(e instanceof Error ? e.message : "Could not plan that trip");
+    } finally {
+      setPlanning(false);
+    }
+  }, [destQuery, originQuery, gps.position, stops]);
+
+  // Turn a planned ride leg into a tracked journey.
+  const useLeg = useCallback(
+    async (leg: JourneyLeg) => {
+      setRouteLoading(true);
+      setRouteError(null);
+      try {
+        const { route, boardingSeq: on, destinationSeq: off } =
+          await loadRouteForLeg(leg);
+        setStops(route.stops);
+        setRoutePath(route.path);
+        setRouteName(
+          `${route.company.toUpperCase()} ${route.routeCode} · ${route.origEn} → ${route.destEn}`,
+        );
+        setRouteRef({
+          routeId: route.routeId,
+          routeCode: route.routeCode,
+          company: route.company,
+        });
+        setEta(null);
+        setBoarded(false);
+        setBoardingSeq(on);
+        setDestinationSeq(off);
+        setPlanOptions(null);
+        simReset();
+      } catch (e) {
+        setRouteError(e instanceof Error ? e.message : "Could not load route");
+      } finally {
+        setRouteLoading(false);
+      }
+    },
+    [simReset],
+  );
+
   const tracked = useRideTracker(
     stops,
     destinationSeq,
@@ -778,50 +845,153 @@ export default function RidePage() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 p-4">
       {header}
 
+      {/* Destination first: naming a place is what riders can actually do */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+        <p className="text-sm font-semibold">Where do you want to go?</p>
+        <p className="mt-0.5 text-xs text-slate-500">
+          Name the place — we&apos;ll find the minibus, the fare and the stop.
+        </p>
+        {!gps.position && (
+          <span className="field mt-2 block">
+            <span aria-hidden className="field-icon">
+              🧍
+            </span>
+            <input
+              className="field-input"
+              placeholder="From (e.g. Shek Pai Wan Estate)"
+              value={originQuery}
+              onChange={(e) => setOriginQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && planTrip()}
+            />
+          </span>
+        )}
+        <div className="mt-2 flex gap-2">
+          <span className="field min-w-0 flex-1">
+            <span aria-hidden className="field-icon">
+              🎯
+            </span>
+            <input
+              className="field-input"
+              placeholder="To (e.g. Times Square)"
+              value={destQuery}
+              onChange={(e) => setDestQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && planTrip()}
+            />
+          </span>
+          <button
+            onClick={planTrip}
+            disabled={planning || !destQuery.trim()}
+            className="rounded-xl bg-indigo-600 px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
+          >
+            {planning ? "…" : "Plan"}
+          </button>
+        </div>
+        {planError && <p className="mt-2 text-sm text-red-600">{planError}</p>}
+        {planning && (
+          <div className="mt-3 space-y-2">
+            <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
+            <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
+          </div>
+        )}
+
+        {planOptions && planOptions.length > 0 && (
+          <ul className="mt-3 space-y-2">
+            {planOptions.map((opt, i) => {
+              const ride = opt.legs.find(
+                (l) => l.kind === "ride" && l.routeCode,
+              );
+              const minibus = opt.legs.find(
+                (l) => l.kind === "ride" && l.company === "gmb",
+              );
+              const target = minibus ?? ride;
+              return (
+                <li
+                  key={i}
+                  className="rounded-xl border border-slate-200 p-3 text-sm"
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-semibold">{opt.minutes} min</span>
+                    <span className="text-xs text-slate-500">
+                      {opt.fare !== null && `HK$${opt.fare.toFixed(1)} · `}
+                      {opt.km.toFixed(1)} km
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1 text-xs">
+                    {opt.legs.map((l, j) => (
+                      <span key={j} className="flex items-center gap-1">
+                        {j > 0 && <span className="text-slate-300">›</span>}
+                        {l.kind === "walk" ? (
+                          <span className="text-slate-500">
+                            🚶 {l.minutes}m
+                          </span>
+                        ) : (
+                          <span
+                            className={`rounded-full px-2 py-0.5 font-semibold ${
+                              l.company === "gmb"
+                                ? "bg-emerald-100 text-emerald-900"
+                                : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            {l.company === "gmb" ? "🚐" : "🚌"}{" "}
+                            {l.routeCode ?? "?"}
+                            {l.numStops ? ` · ${l.numStops} stops` : ""}
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                  {target && (
+                    <button
+                      onClick={() => useLeg(target)}
+                      disabled={routeLoading}
+                      className="mt-2 w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white transition active:scale-95 disabled:opacity-50"
+                    >
+                      {routeLoading
+                        ? "Loading…"
+                        : `Track ${target.company === "gmb" ? "this minibus" : `${target.routeCode}`}`}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <button
+          onClick={() => setShowRouteCode((s) => !s)}
+          className="mt-3 text-xs font-medium text-indigo-600"
+        >
+          {showRouteCode ? "− Hide route code" : "+ I already know the route code"}
+        </button>
+        {showRouteCode && (
+          <div className="mt-2 flex gap-2">
+            <span className="field min-w-0 flex-1">
+              <span aria-hidden className="field-icon">
+                🚏
+              </span>
+              <input
+                className="field-input"
+                placeholder="GMB route code, e.g. 4C"
+                value={routeCode}
+                onChange={(e) => setRouteCode(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && loadRoute()}
+              />
+            </span>
+            <button
+              onClick={loadRoute}
+              disabled={routeLoading || !routeCode.trim()}
+              className="rounded-xl bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
+            >
+              {routeLoading ? "Loading…" : "Load"}
+            </button>
+          </div>
+        )}
+      </section>
+
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <p className="text-xs uppercase tracking-wide text-slate-500">
           {routeName}
         </p>
-        <div className="mt-2 flex gap-2">
-          <span className="field min-w-0 flex-1">
-            <span aria-hidden className="field-icon">
-              🚏
-            </span>
-            <input
-              className="field-input"
-              placeholder="GMB route code, e.g. 4C"
-              value={routeCode}
-              onChange={(e) => setRouteCode(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && loadRoute()}
-            />
-          </span>
-          <button
-            onClick={loadRoute}
-            disabled={routeLoading || !routeCode.trim()}
-            className="rounded-xl bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
-          >
-            {routeLoading ? "Loading…" : "Load"}
-          </button>
-        </div>
-        {!routeLoaded && !routeLoading && !routeError && (
-          <p className="mt-2 text-xs text-slate-500">
-            Bundled route snapshot — load it live for real-time arrivals. Try{" "}
-            <button
-              onClick={() => setRouteCode("4C")}
-              className="font-semibold text-indigo-600 underline"
-            >
-              4C
-            </button>{" "}
-            or{" "}
-            <button
-              onClick={() => setRouteCode("5")}
-              className="font-semibold text-indigo-600 underline"
-            >
-              5
-            </button>{" "}
-            (Hong Kong Island).
-          </p>
-        )}
         {routeLoading && (
           <div className="mt-3 space-y-2">
             <div className="h-9 animate-pulse rounded-lg bg-slate-100" />
