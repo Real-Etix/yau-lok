@@ -7,7 +7,48 @@
 // location" — we geocode the destination and route with OSRM instead.
 
 import { toolhubCall, toolhubConfigured } from "@/lib/toolhub-server";
+import { chat, hkgaiConfigured } from "@/lib/hkgai";
 import { decodePolyline, estimateUrbanFare } from "@/lib/taxi";
+
+const hasChinese = (s: string | null | undefined) =>
+  !!s && /[一-鿿]/.test(s);
+
+/**
+ * A driver needs the venue, not the district. The geocoder is inconsistent:
+ * for HKU it returns name_tc 香港大學 with the vague address 香港薄扶林, while
+ * for Times Square the name comes back in English and only the address is
+ * Chinese. So prefer a Chinese NAME, fall back to the address, and ask the
+ * model to supply the established Chinese name when neither is usable.
+ */
+async function chineseVenueName(
+  place: GeoResult | null,
+  fallbackQuery: string,
+): Promise<string | null> {
+  if (hasChinese(place?.name_tc)) return place!.name_tc;
+  if (!hkgaiConfigured()) return place?.address_tc ?? null;
+  try {
+    const raw = await chat([
+      {
+        role: "system",
+        content:
+          'Give the established Traditional Chinese name used in Hong Kong for a place. Reply with strict JSON only: {"chinese":"<the Chinese name, or empty string if you are not confident>"}. Do not transliterate; if there is no well-known Chinese name, return an empty string.',
+      },
+      {
+        role: "user",
+        content: `${place?.name_tc || fallbackQuery}${
+          place?.address_tc ? ` (near ${place.address_tc})` : ""
+        }`,
+      },
+    ]);
+    const parsed = JSON.parse(
+      raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1),
+    );
+    if (hasChinese(parsed?.chinese)) return parsed.chinese as string;
+  } catch {
+    // fall through
+  }
+  return place?.address_tc ?? null;
+}
 
 type DrivingResult = {
   duration_seconds: number;
@@ -174,11 +215,16 @@ export async function POST(request: Request) {
     }
 
     const hit = destGeo ?? (await geocode(dest));
-    const chinese = hit?.address_tc || hit?.name_tc || null;
+    const chinese = await chineseVenueName(hit, dest);
+    // Keep the street address separate so the card can show venue + street:
+    // the venue tells the driver where, the street tells them how.
+    const address =
+      hit?.address_tc && hit.address_tc !== chinese ? hit.address_tc : null;
 
     return Response.json({
       ...route,
       destinationChinese: chinese,
+      destinationAddress: address,
       destinationInput: dest,
       fare: estimateUrbanFare(route.distanceM, route.durationS),
     });

@@ -15,6 +15,7 @@ type Plan = {
   durationS: number;
   path: [number, number][];
   destinationChinese: string | null;
+  destinationAddress: string | null;
   destinationInput: string;
   fare: { low: number; high: number; base: number };
 };
@@ -265,6 +266,11 @@ export default function TaxiPage() {
             <p className="mt-1 text-3xl font-bold leading-snug">
               {plan.destinationChinese ?? plan.destinationInput}
             </p>
+            {plan.destinationAddress && (
+              <p className="mt-1 text-lg font-medium text-slate-700">
+                {plan.destinationAddress}
+              </p>
+            )}
             <p className="mt-1 text-sm text-slate-500">
               {plan.destinationInput}
             </p>
