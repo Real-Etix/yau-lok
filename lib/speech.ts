@@ -248,7 +248,11 @@ export function listenCantonese(): Promise<string> {
   return listenOnce("zh-HK", ["有落", "巴士站", "落車"]);
 }
 
-/** The user dictating what they want to say, usually in English. */
-export function listenUserSpeech(): Promise<string> {
-  return listenOnce("en-US");
+/**
+ * The user dictating what they want to say, in whichever language they
+ * speak. HKGAI's recogniser is language-agnostic; `bcp47` only steers the
+ * browser fallback.
+ */
+export function listenUserSpeech(bcp47 = "en-US"): Promise<string> {
+  return listenOnce(bcp47);
 }

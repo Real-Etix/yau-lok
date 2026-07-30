@@ -28,6 +28,11 @@ import {
   type RouteEta,
 } from "@/lib/toolhub";
 import { VOICE_PERSONAS, DEFAULT_PERSONA_KEY } from "@/data/voices";
+import {
+  USER_LANGUAGES,
+  DEFAULT_LANGUAGE_CODE,
+  getLanguage,
+} from "@/data/languages";
 import RideMap from "@/components/RideMap";
 import SelectField from "@/components/SelectField";
 import { haversineMeters, lerp, type LatLng } from "@/lib/geo";
@@ -75,7 +80,8 @@ const TOOLS: { id: ToolId; label: string }[] = [
 type SayResult = {
   cantonese: string;
   jyutping: string;
-  english: string;
+  /** Back-translation, written in the user's own language */
+  back: string;
   note?: string;
 };
 
@@ -171,6 +177,15 @@ export default function RidePage() {
   const [sayListening, setSayListening] = useState(false);
   const [sayError, setSayError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [langCode, setLangCode] = useState(DEFAULT_LANGUAGE_CODE);
+  useEffect(() => {
+    const saved = localStorage.getItem("yau-lok-lang");
+    if (saved && USER_LANGUAGES.some((l) => l.code === saved)) setLangCode(saved);
+  }, []);
+  const pickLanguage = useCallback((code: string) => {
+    setLangCode(code);
+    localStorage.setItem("yau-lok-lang", code);
+  }, []);
   const [activeTool, setActiveTool] = useState<ToolId | null>(null);
   const [driverReply, setDriverReply] = useState<DriverReply | null>(null);
   const [listenError, setListenError] = useState<string | null>(null);
@@ -562,7 +577,7 @@ export default function RidePage() {
         const res = await fetch("/api/say", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, language: getLanguage(langCode).name }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "could not translate");
@@ -575,7 +590,7 @@ export default function RidePage() {
         setSayLoading(false);
       }
     },
-    [personaKey],
+    [personaKey, langCode],
   );
 
   const sayIt = useCallback(() => runSay(sayText), [runSay, sayText]);
@@ -587,7 +602,7 @@ export default function RidePage() {
     setSayError(null);
     setSayResult(null);
     try {
-      const heard = await listenUserSpeech();
+      const heard = await listenUserSpeech(getLanguage(langCode).bcp47);
       setSayText(heard);
       setSayListening(false);
       await runSay(heard);
@@ -595,7 +610,7 @@ export default function RidePage() {
       setSayError(friendlyMicError(e));
       setSayListening(false);
     }
-  }, [runSay]);
+  }, [runSay, langCode]);
 
   const listenToDriver = useCallback(async () => {
     setListening(true);
@@ -655,9 +670,31 @@ export default function RidePage() {
         Say anything · AI
       </p>
       <p className="mt-0.5 text-xs text-slate-500">
-        Speak or type in English — HKGAI turns it into what a local would
-        actually say, then says it out loud for you.
+        Speak or type in your own language — HKGAI turns it into what a local
+        would actually say, then says it out loud for you.
       </p>
+
+      <label className="mt-2 block">
+        <span className="mb-1 block text-xs font-medium text-slate-600">
+          I speak
+        </span>
+        <span className="field">
+          <span aria-hidden className="field-icon">
+            🌏
+          </span>
+          <select
+            className="field-select"
+            value={langCode}
+            onChange={(e) => pickLanguage(e.target.value)}
+          >
+            {USER_LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </span>
+      </label>
 
       <button
         onClick={sayByVoice}
@@ -682,7 +719,7 @@ export default function RidePage() {
           </span>
           <input
             className="field-input"
-            placeholder="…or type: stop after the temple, big suitcase"
+            placeholder="…or type it — any language"
             value={sayText}
             onChange={(e) => setSayText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sayIt()}
@@ -711,7 +748,7 @@ export default function RidePage() {
             </span>
           )}
           <span className="mt-0.5 block text-xs opacity-80">
-            {sayResult.english} · tap to repeat
+            {sayResult.back} · tap to repeat
           </span>
         </button>
       )}

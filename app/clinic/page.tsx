@@ -4,6 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { CLINIC_PHRASES, type ClinicPhrase } from "@/data/clinic-phrases";
 import { VOICE_PERSONAS, DEFAULT_PERSONA_KEY } from "@/data/voices";
+import {
+  USER_LANGUAGES,
+  DEFAULT_LANGUAGE_CODE,
+  getLanguage,
+} from "@/data/languages";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { getAeWaits, type AeHospital } from "@/lib/toolhub";
 import { friendlyMicError, listenUserSpeech, speakCantonese } from "@/lib/speech";
@@ -11,7 +16,8 @@ import { friendlyMicError, listenUserSpeech, speakCantonese } from "@/lib/speech
 type SayResult = {
   cantonese: string;
   jyutping: string;
-  english: string;
+  /** Back-translation, written in the user's own language */
+  back: string;
   note?: string;
 };
 
@@ -24,6 +30,7 @@ const GROUPS: { id: ClinicPhrase["group"]; label: string }[] = [
 export default function ClinicPage() {
   const [personaKey, setPersonaKey] = useState(DEFAULT_PERSONA_KEY);
   const [coach, setCoach] = useState(true);
+  const [langCode, setLangCode] = useState(DEFAULT_LANGUAGE_CODE);
   const [speaking, setSpeaking] = useState<string | null>(null);
   const [hospitals, setHospitals] = useState<AeHospital[] | null>(null);
   const [loadingWaits, setLoadingWaits] = useState(true);
@@ -41,6 +48,8 @@ export default function ClinicPage() {
     if (saved && VOICE_PERSONAS.some((p) => p.key === saved)) {
       setPersonaKey(saved);
     }
+    const lang = localStorage.getItem("yau-lok-lang");
+    if (lang && USER_LANGUAGES.some((l) => l.code === lang)) setLangCode(lang);
   }, []);
 
   // Nearest A&E departments, with live waiting times.
@@ -82,7 +91,7 @@ export default function ClinicPage() {
         const res = await fetch("/api/say", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, language: getLanguage(langCode).name }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "could not translate");
@@ -94,7 +103,7 @@ export default function ClinicPage() {
         setSayLoading(false);
       }
     },
-    [personaKey],
+    [personaKey, langCode],
   );
 
   const sayByVoice = useCallback(async () => {
@@ -102,7 +111,7 @@ export default function ClinicPage() {
     setSayError(null);
     setSayResult(null);
     try {
-      const heard = await listenUserSpeech();
+      const heard = await listenUserSpeech(getLanguage(langCode).bcp47);
       setSayText(heard);
       setSayListening(false);
       await runSay(heard);
@@ -110,7 +119,7 @@ export default function ClinicPage() {
       setSayError(friendlyMicError(e));
       setSayListening(false);
     }
-  }, [runSay]);
+  }, [runSay, langCode]);
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 p-4">
@@ -182,6 +191,31 @@ export default function ClinicPage() {
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
           Say anything · AI
         </p>
+        <label className="mt-2 block">
+          <span className="mb-1 block text-xs font-medium text-slate-600">
+            I speak
+          </span>
+          <span className="field">
+            <span aria-hidden className="field-icon">
+              🌏
+            </span>
+            <select
+              className="field-select"
+              value={langCode}
+              onChange={(e) => {
+                setLangCode(e.target.value);
+                localStorage.setItem("yau-lok-lang", e.target.value);
+              }}
+            >
+              {USER_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </span>
+        </label>
+
         <button
           onClick={sayByVoice}
           disabled={sayListening || sayLoading}
@@ -193,7 +227,7 @@ export default function ClinicPage() {
             ? "🔴 Listening… speak now"
             : sayLoading
               ? "Translating…"
-              : "🎙️ Describe it in English"}
+              : "🎙️ Describe it in your language"}
         </button>
         <div className="mt-2 flex gap-2">
           <span className="field min-w-0 flex-1">
@@ -202,7 +236,7 @@ export default function ClinicPage() {
             </span>
             <input
               className="field-input"
-              placeholder="…or type: my daughter has had a fever since Monday"
+              placeholder="…or type it — any language"
               value={sayText}
               onChange={(e) => setSayText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && runSay(sayText)}
@@ -231,7 +265,7 @@ export default function ClinicPage() {
               </span>
             )}
             <span className="mt-0.5 block text-xs opacity-80">
-              {sayResult.english} · tap to repeat
+              {sayResult.back} · tap to repeat
             </span>
           </button>
         )}
