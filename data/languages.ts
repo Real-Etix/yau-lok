@@ -15,7 +15,13 @@ export type UserLanguage = {
 
 export const USER_LANGUAGES: UserLanguage[] = [
   { code: "en", label: "English", name: "English", bcp47: "en-US" },
-  { code: "cmn", label: "普通話 · Mandarin", name: "Mandarin Chinese (simplified characters)", bcp47: "zh-CN" },
+  {
+    code: "zhHant",
+    label: "繁體中文 · Traditional Chinese",
+    name: "Traditional Chinese as written in Hong Kong",
+    bcp47: "zh-HK",
+  },
+  { code: "cmn", label: "简体中文 · Mandarin", name: "Mandarin Chinese (simplified characters)", bcp47: "zh-CN" },
   { code: "id", label: "Bahasa Indonesia", name: "Indonesian", bcp47: "id-ID" },
   { code: "fil", label: "Filipino · Tagalog", name: "Filipino (Tagalog)", bcp47: "fil-PH" },
   { code: "hi", label: "हिन्दी · Hindi", name: "Hindi", bcp47: "hi-IN" },

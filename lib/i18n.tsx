@@ -14,6 +14,7 @@ import {
 } from "react";
 import { DEFAULT_LANGUAGE_CODE, getLanguage } from "@/data/languages";
 import en from "@/data/i18n/en.json";
+import zhHant from "@/data/i18n/zhHant.json";
 import cmn from "@/data/i18n/cmn.json";
 import id from "@/data/i18n/id.json";
 import fil from "@/data/i18n/fil.json";
@@ -24,7 +25,7 @@ import th from "@/data/i18n/th.json";
 
 type Dict = Record<string, string>;
 
-const DICTS: Record<string, Dict> = { en, cmn, id, fil, hi, ne, ur, th };
+const DICTS: Record<string, Dict> = { en, zhHant, cmn, id, fil, hi, ne, ur, th };
 
 export const STORAGE_KEY = "yau-lok-lang";
 

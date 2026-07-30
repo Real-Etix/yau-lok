@@ -30,6 +30,13 @@ if (!KEY) {
 
 // Keep in sync with data/languages.ts
 const LANGUAGES = [
+  [
+    "zhHant",
+    // Interface text in Hong Kong is 書面語, the way apps, signage and
+    // newspapers are written. Left looser, the model mixes in colloquial
+    // written Cantonese (俾/睇/嘅/喺), which reads inconsistent.
+    "Traditional Chinese in the STANDARD WRITTEN form used in Hong Kong (書面語) — the register of app interfaces, signage and newspapers. Use 給/看/的/在/和/他們/沒有/不, NEVER the colloquial Cantonese forms 俾/睇/嘅/喺/同/佢哋/冇/唔/咗/嚟/啲/哋. Exception: leave any quoted Cantonese phrase the user will actually speak exactly as given",
+  ],
   // "as used in Hong Kong" made the model produce written CANTONESE
   // (嗌/咗/散銀), which a mainland Mandarin speaker would struggle with.
   [
