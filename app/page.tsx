@@ -9,6 +9,13 @@ const SCENARIOS = [
     live: true,
   },
   {
+    href: "/taxi",
+    emoji: "🚕",
+    title: "Taxi",
+    subtitle: "Show the address in Chinese, estimate the fare, watch the route",
+    live: true,
+  },
+  {
     href: "#",
     emoji: "🍜",
     title: "Cha chaan teng",
