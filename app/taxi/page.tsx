@@ -53,7 +53,10 @@ export default function TaxiPage() {
   const [sayListening, setSayListening] = useState(false);
   const [sayError, setSayError] = useState<string | null>(null);
 
-  const gps = useGeolocation(riding);
+  // Location is opt-in before the ride: asked for only when the passenger
+  // taps "use my location", and always on once they're in the taxi.
+  const [wantLocation, setWantLocation] = useState(false);
+  const gps = useGeolocation(riding || wantLocation);
   useWakeLock(riding);
 
   useEffect(() => {
@@ -208,12 +211,28 @@ export default function TaxiPage() {
           <span aria-hidden className="field-icon">🧍</span>
           <input
             className="field-input"
-            placeholder={gps.position ? "From (blank = my location)" : "From (e.g. Shek Pai Wan Estate)"}
+            placeholder="From (e.g. Shek Pai Wan Estate)"
             value={originQuery}
             onChange={(e) => setOriginQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && planTrip()}
           />
         </span>
+        <button
+          onClick={() => {
+            setWantLocation(true);
+            setOriginQuery("");
+          }}
+          className="mt-1 text-xs font-medium text-indigo-600"
+        >
+          {gps.position
+            ? `📍 using my location (±${Math.round(gps.accuracy ?? 0)} m)`
+            : wantLocation
+              ? "locating…"
+              : "📍 or start from my location"}
+        </button>
+        {wantLocation && gps.error && (
+          <p className="mt-1 text-xs text-red-600">{gps.error}</p>
+        )}
         <div className="mt-2 flex gap-2">
           <span className="field min-w-0 flex-1">
             <span aria-hidden className="field-icon">🎯</span>
