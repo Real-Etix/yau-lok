@@ -34,6 +34,7 @@ import {
   getLanguage,
 } from "@/data/languages";
 import RideMap from "@/components/RideMap";
+import { useT } from "@/lib/i18n";
 import SelectField from "@/components/SelectField";
 import { haversineMeters, lerp, type LatLng } from "@/lib/geo";
 import {
@@ -44,18 +45,18 @@ import {
   speakPhrase,
 } from "@/lib/speech";
 
-const STATE_LABEL: Record<RideState, { text: string; className: string }> = {
-  riding: { text: "On the way", className: "bg-emerald-100 text-emerald-900" },
+const STATE_LABEL: Record<RideState, { key: string; className: string }> = {
+  riding: { key: "ride.onTheWay", className: "bg-emerald-100 text-emerald-900" },
   approaching: {
-    text: "Your stop is coming up — get ready!",
+    key: "ride.comingUp",
     className: "bg-amber-200 text-amber-950",
   },
   arrive_now: {
-    text: "SHOUT NOW — your stop is here!",
+    key: "ride.shoutNow",
     className: "bg-red-500 text-white animate-pulse",
   },
   arrived: {
-    text: "You made it — 唔該晒 driver!",
+    key: "ride.arrived",
     className: "bg-slate-200 text-slate-800",
   },
 };
@@ -69,12 +70,12 @@ type DriverReply = {
 
 type ToolId = "phrases" | "say" | "listen" | "nearby" | "voice";
 
-const TOOLS: { id: ToolId; label: string }[] = [
-  { id: "phrases", label: "🗣️ Ask the driver" },
-  { id: "say", label: "✍️ Say anything · AI" },
-  { id: "listen", label: "🎤 Listen" },
-  { id: "nearby", label: "🚻 Nearby" },
-  { id: "voice", label: "🔊 Voice" },
+const TOOLS: { id: ToolId; key: string; emoji: string }[] = [
+  { id: "phrases", key: "tool.askDriver", emoji: "🗣️" },
+  { id: "say", key: "tool.sayAnything", emoji: "✍️" },
+  { id: "listen", key: "tool.listen", emoji: "🎤" },
+  { id: "nearby", key: "tool.nearby", emoji: "🚻" },
+  { id: "voice", key: "tool.voice", emoji: "🔊" },
 ];
 
 type SayResult = {
@@ -147,6 +148,7 @@ function useSimulatedRide(active: boolean, path: LatLng[]) {
 }
 
 export default function RidePage() {
+  const t = useT();
   const [demoMode, setDemoMode] = useState(true);
   const [boardingSeq, setBoardingSeq] = useState(DEMO_STOPS[0].seq);
   const [destinationSeq, setDestinationSeq] = useState<number | null>(
@@ -863,14 +865,14 @@ export default function RidePage() {
           {routeName.replace(" (live via Toolhub)", "")}
           <span className="mt-0.5 block font-medium text-slate-800">
             {stops[boardingIdx]?.name.en} → {status.destination?.name.en}
-            <span className="ml-1 font-normal text-indigo-600">· change</span>
+            <span className="ml-1 font-normal text-indigo-600">· {t("ride.change")}</span>
           </span>
         </button>
 
         <section
           className={`shrink-0 rounded-2xl p-3 text-center font-semibold ${label.className}`}
         >
-          <p className="text-lg">{label.text}</p>
+          <p className="text-lg">{t(label.key)}</p>
           {status.distanceM !== null && (
             <p className="mt-0.5 text-sm font-normal">
               {status.etaMinutes !== null &&
@@ -915,7 +917,7 @@ export default function RidePage() {
               }}
               className="mt-2 rounded-lg bg-white/70 px-3 py-1.5 text-sm font-medium"
             >
-              ↺ New ride
+              ↺ {t("ride.newRide")}
             </button>
           )}
         </section>
@@ -994,9 +996,9 @@ export default function RidePage() {
 
       {/* Destination first: naming a place is what riders can actually do */}
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <p className="text-sm font-semibold">Where do you want to go?</p>
+        <p className="text-sm font-semibold">{t("ride.whereTo")}</p>
         <p className="mt-0.5 text-xs text-slate-500">
-          Name the place — we&apos;ll find the minibus, the fare and the stop.
+          {t("ride.whereToHint")}
         </p>
         {!gps.position && (
           <span className="field mt-2 block">
@@ -1005,7 +1007,7 @@ export default function RidePage() {
             </span>
             <input
               className="field-input"
-              placeholder="From (e.g. Shek Pai Wan Estate)"
+              placeholder={t("ride.from")}
               value={originQuery}
               onChange={(e) => setOriginQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && planTrip()}
@@ -1019,7 +1021,7 @@ export default function RidePage() {
             </span>
             <input
               className="field-input"
-              placeholder="To (e.g. Times Square)"
+              placeholder={t("ride.to")}
               value={destQuery}
               onChange={(e) => setDestQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && planTrip()}
@@ -1030,7 +1032,7 @@ export default function RidePage() {
             disabled={planning || !destQuery.trim()}
             className="rounded-xl bg-indigo-600 px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
           >
-            {planning ? "…" : "Plan"}
+            {planning ? "…" : t("ride.plan")}
           </button>
         </div>
         {planError && <p className="mt-2 text-sm text-red-600">{planError}</p>}
@@ -1116,7 +1118,7 @@ export default function RidePage() {
           onClick={() => setShowRouteCode((s) => !s)}
           className="mt-3 text-xs font-medium text-indigo-600"
         >
-          {showRouteCode ? "− Hide route code" : "+ I already know the route code"}
+          {showRouteCode ? "−" : "+"} {t("ride.knowCode")}
         </button>
         {showRouteCode && (
           <div className="mt-2 flex gap-2">
@@ -1137,7 +1139,7 @@ export default function RidePage() {
               disabled={routeLoading || !routeCode.trim()}
               className="rounded-xl bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
             >
-              {routeLoading ? "Loading…" : "Load"}
+              {routeLoading ? "…" : t("ride.load")}
             </button>
           </div>
         )}
@@ -1156,7 +1158,7 @@ export default function RidePage() {
         {routeError && <p className="mt-2 text-sm text-red-600">{routeError}</p>}
 
         <SelectField
-          label="Get on at"
+          label={t("ride.getOn")}
           icon="📍"
           accent="indigo"
           value={boardingSeq}
@@ -1164,7 +1166,7 @@ export default function RidePage() {
           hint={
             eta && eta.etaMinutes.length > 0 ? (
               <p className="mt-2 rounded-xl border border-emerald-100 bg-emerald-50 p-2.5 text-sm text-emerald-900">
-                🚐 Next minibus:{" "}
+                🚐 {t("ride.nextMinibus")}:{" "}
                 <span className="font-semibold">
                   {eta.etaMinutes
                     .slice(0, 3)
@@ -1172,12 +1174,12 @@ export default function RidePage() {
                     .join(" · ")}
                 </span>
                 <span className="mt-0.5 block text-xs text-emerald-700">
-                  live from HKGAI Toolhub · updates every 30s
+                  {t("ride.etaLive")}
                 </span>
               </p>
             ) : routeLoaded ? (
               <div className="mt-2 rounded-xl bg-slate-50 p-2.5 text-xs text-slate-500">
-                No live arrivals at this stop right now.
+                {t("ride.noArrivals")}
                 {!serviceInfo && (
                   <button
                     onClick={checkService}
@@ -1185,8 +1187,8 @@ export default function RidePage() {
                     className="ml-1 font-semibold text-indigo-600 underline disabled:opacity-50"
                   >
                     {serviceLoading
-                      ? "Checking the web…"
-                      : "Is it still running?"}
+                      ? t("ride.checking")
+                      : t("ride.stillRunning")}
                   </button>
                 )}
                 {serviceInfo && (
@@ -1227,7 +1229,7 @@ export default function RidePage() {
         </SelectField>
 
         <SelectField
-          label="Get off at"
+          label={t("ride.getOff")}
           icon="🏁"
           accent="red"
           value={destinationSeq ?? ""}
@@ -1235,11 +1237,9 @@ export default function RidePage() {
           hint={
             fare !== null ? (
               <p className="mt-2 rounded-xl border border-amber-100 bg-amber-50 p-2.5 text-sm text-amber-900">
-                💰 Fare <span className="font-semibold">HK${fare.toFixed(1)}</span>{" "}
-                for this trip
+                💰 {t("ride.fare")} <span className="font-semibold">HK${fare.toFixed(1)}</span>
                 <span className="mt-0.5 block text-xs text-amber-800">
-                  Minibus drivers rarely give change — have coins or Octopus
-                  ready.
+                  {t("ride.fareHint")}
                 </span>
               </p>
             ) : null
@@ -1287,7 +1287,7 @@ export default function RidePage() {
           {weather.station && ` at ${weather.station}`}
           {weather.wet && (
             <span className="mt-0.5 block text-xs">
-              Bring an umbrella — you&apos;ll be waiting at the kerb.
+              {t("ride.umbrella")}
             </span>
           )}
         </p>
@@ -1297,28 +1297,28 @@ export default function RidePage() {
         onClick={() => setBoarded(true)}
         className="rounded-2xl bg-indigo-600 p-5 text-center text-lg font-semibold text-white shadow-lg transition active:scale-95"
       >
-        🚐 I&apos;m on board — start tracking
+        🚐 {t("ride.onBoard")}
         <span className="mt-0.5 block text-sm font-normal opacity-85">
-          waiting at {stops[boardingIdx]?.name.en}
+          {t("ride.waitingAt")} {stops[boardingIdx]?.name.en}
         </span>
       </button>
 
       {/* Secondary tools stay one tap away instead of stacked on the page */}
       <section>
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-          {TOOLS.map((t) => (
+          {TOOLS.map((tool) => (
             <button
-              key={t.id}
+              key={tool.id}
               onClick={() =>
-                setActiveTool((cur) => (cur === t.id ? null : t.id))
+                setActiveTool((cur) => (cur === tool.id ? null : tool.id))
               }
               className={`shrink-0 rounded-full px-3.5 py-2 text-sm font-medium transition active:scale-95 ${
-                activeTool === t.id
+                activeTool === tool.id
                   ? "bg-slate-900 text-white"
                   : "border border-slate-200 bg-white text-slate-700"
               }`}
             >
-              {t.label}
+              {tool.emoji} {t(tool.key)}
             </button>
           ))}
         </div>

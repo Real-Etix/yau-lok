@@ -9,6 +9,8 @@ export type UserLanguage = {
   name: string;
   /** BCP-47 tag for the browser speech-recognition fallback */
   bcp47: string;
+  /** Right-to-left script — the whole document flips, not just text */
+  rtl?: boolean;
 };
 
 export const USER_LANGUAGES: UserLanguage[] = [
@@ -18,7 +20,7 @@ export const USER_LANGUAGES: UserLanguage[] = [
   { code: "fil", label: "Filipino · Tagalog", name: "Filipino (Tagalog)", bcp47: "fil-PH" },
   { code: "hi", label: "हिन्दी · Hindi", name: "Hindi", bcp47: "hi-IN" },
   { code: "ne", label: "नेपाली · Nepali", name: "Nepali", bcp47: "ne-NP" },
-  { code: "ur", label: "اردو · Urdu", name: "Urdu", bcp47: "ur-PK" },
+  { code: "ur", label: "اردو · Urdu", name: "Urdu", bcp47: "ur-PK", rtl: true },
   { code: "th", label: "ไทย · Thai", name: "Thai", bcp47: "th-TH" },
 ];
 

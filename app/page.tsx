@@ -1,37 +1,18 @@
+"use client";
+
 import Link from "next/link";
+import LanguagePicker from "@/components/LanguagePicker";
+import { useT } from "@/lib/i18n";
 
 const SCENARIOS = [
-  {
-    href: "/ride",
-    emoji: "🚐",
-    title: "Minibus ride",
-    subtitle: "Know when to shout 有落 — or let the app shout for you",
-    live: true,
-  },
-  {
-    href: "/taxi",
-    emoji: "🚕",
-    title: "Taxi",
-    subtitle: "Show the address in Chinese, estimate the fare, watch the route",
-    live: true,
-  },
-  {
-    href: "#",
-    emoji: "🍜",
-    title: "Cha chaan teng",
-    subtitle: "Point at a menu, order like a local",
-    live: false,
-  },
-  {
-    href: "/clinic",
-    emoji: "🏥",
-    title: "Clinic & counters",
-    subtitle: "Say what's wrong, and see where the A&E wait is shortest",
-    live: true,
-  },
+  { href: "/ride", emoji: "🚐", key: "minibus", live: true },
+  { href: "/taxi", emoji: "🚕", key: "taxi", live: true },
+  { href: "/clinic", emoji: "🏥", key: "clinic", live: true },
+  { href: "#", emoji: "🍜", key: "chachaanteng", live: false },
 ];
 
 export default function Home() {
+  const t = useT();
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-6">
       <header className="pt-10 text-center">
@@ -40,16 +21,16 @@ export default function Home() {
         </p>
         <h1 className="mt-2 text-2xl font-bold">Yau Lok!</h1>
         <p className="mt-3 text-sm leading-relaxed text-slate-600">
-          A situated Cantonese copilot for Hong Kong. It knows where you are,
-          speaks up at the right moment, and teaches you the phrase so next
-          time you won&apos;t need it.
+          {t("app.tagline")}
         </p>
       </header>
+
+      <LanguagePicker hint />
 
       <section className="flex flex-col gap-3">
         {SCENARIOS.map((s) => (
           <Link
-            key={s.title}
+            key={s.key}
             href={s.href}
             aria-disabled={!s.live}
             tabIndex={s.live ? undefined : -1}
@@ -62,35 +43,33 @@ export default function Home() {
             <span className="text-3xl">{s.emoji}</span>
             <span className="min-w-0">
               <span className="block font-semibold">
-                {s.title}
+                {t(`home.${s.key}`)}
                 {!s.live && (
                   <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
-                    soon
+                    {t("home.soon")}
                   </span>
                 )}
               </span>
-              <span className="block text-sm text-slate-500">{s.subtitle}</span>
+              <span className="block text-sm text-slate-500">
+                {t(`home.${s.key}Sub`)}
+              </span>
             </span>
             {s.live && (
-              <span className="ml-auto text-xl text-slate-300">›</span>
+              <span className="ms-auto text-xl text-slate-300">›</span>
             )}
           </Link>
         ))}
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
-        <p className="font-semibold">Why not just a translator?</p>
+        <p className="font-semibold">{t("home.whyTitle")}</p>
         <p className="mt-1 leading-relaxed text-slate-600">
-          Translators answer when you ask. Yau Lok knows{" "}
-          <span className="font-medium text-slate-900">when</span> to speak —
-          it tracks the route, alerts you before your stop, and shouts in
-          colloquial Cantonese so the driver actually stops.
+          {t("home.whyBody")}
         </p>
       </section>
 
       <footer className="mt-auto pb-4 text-center text-xs leading-relaxed text-slate-400">
-        Cantonese speech &amp; translation by HKGAI Modelhub · routes and live
-        arrivals via HKGAI Toolhub &amp; HK open government data
+        {t("home.credits")}
       </footer>
     </main>
   );

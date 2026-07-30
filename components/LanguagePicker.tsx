@@ -1,0 +1,41 @@
+"use client";
+
+import { USER_LANGUAGES } from "@/data/languages";
+import { useLanguage } from "@/lib/i18n";
+
+/**
+ * One control for one idea: the language you speak. It sets the interface
+ * language AND the language we translate back into, because a user who
+ * can't read English can't check an English back-translation either.
+ */
+export default function LanguagePicker({ hint }: { hint?: boolean }) {
+  const { lang, setLang, t } = useLanguage();
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium text-slate-600">
+        {t("app.language")}
+      </span>
+      <span className="field">
+        <span aria-hidden className="field-icon">
+          🌏
+        </span>
+        <select
+          className="field-select"
+          value={lang}
+          onChange={(e) => setLang(e.target.value)}
+        >
+          {USER_LANGUAGES.map((l) => (
+            <option key={l.code} value={l.code}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+      </span>
+      {hint && (
+        <span className="mt-1 block text-xs text-slate-500">
+          {t("app.languageHint")}
+        </span>
+      )}
+    </label>
+  );
+}
