@@ -72,6 +72,9 @@ export default function RideMap({
       }).addTo(map);
       map.setView([22.28, 114.16], 12);
       mapRef.current = map;
+      if (process.env.NODE_ENV !== "production") {
+        (window as unknown as { __map?: LeafletMap }).__map = map;
+      }
       setReady(true);
     })();
     return () => {
@@ -100,6 +103,13 @@ export default function RideMap({
     ro.observe(containerRef.current);
     return () => ro.disconnect();
   }, [ready]);
+
+  // Switching between the waiting and riding layouts changes the map's box;
+  // re-measure so Leaflet requests tiles for the size it actually has.
+  useEffect(() => {
+    if (!ready) return;
+    mapRef.current?.invalidateSize();
+  }, [ready, tall]);
 
   // (Re)draw route line + stops when the route or picks change.
   useEffect(() => {
@@ -196,18 +206,26 @@ export default function RideMap({
     // rider can see the next couple of stops; after that just follow.
     if (!zoomedForRideRef.current) {
       zoomedForRideRef.current = true;
-      map.setView([position.lat, position.lng], 15, { animate: true });
+      // Not animated: position ticks every 250 ms, and the next panTo would
+      // interrupt an in-flight zoom animation, stranding the map at the
+      // route-overview zoom instead of street level.
+      map.setView([position.lat, position.lng], 15, { animate: false });
     } else {
       map.panTo([position.lat, position.lng], { animate: true });
     }
   }, [ready, position, riding, accuracyM]);
 
+  // Two elements on purpose: React styles the outer one, Leaflet owns the
+  // inner one. Sharing a single div lets a React re-render overwrite the
+  // classes Leaflet adds (leaflet-container et al), which silently breaks
+  // tile positioning — the route line still draws, but the map goes white.
   return (
     <div
-      ref={containerRef}
-      className={`w-full rounded-2xl border border-slate-200 bg-slate-100 ${
+      className={`w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 ${
         tall ? "h-full min-h-40 flex-1" : "h-52"
       }`}
-    />
+    >
+      <div ref={containerRef} className="h-full w-full" />
+    </div>
   );
 }
