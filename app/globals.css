@@ -1,19 +1,40 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   膠牌 — the hand-lettered plastic destination signs in Hong Kong minibuses.
-   Thick red characters for where the bus goes, blue for the fare, on white
-   card stock. Here that vocabulary is semantic, not decorative:
+   GMB livery — the app wears a Hong Kong green minibus. Jade chrome for the
+   roof, cream panels for the body, and the LED dot-matrix destination board
+   from the windscreen wherever a rider reads a number.
 
-     red    = your destination, and the moment to shout
-     blue   = fare and factual information
-     ink    = everything you read
-     paper  = the surface it is printed on
+     brand green = chrome, primary action, "on the way", live data
+     cream       = the body panel behind cards
+     LED amber   = any number that matters (route code, ETA, countdown)
+     red         = your destination, and the moment to shout (kept from 膠牌)
+     amber       = fare warnings and the "coming up" state
 
    Light only, on purpose: demo-day rendering has to be predictable, and a
    half-checked dark palette is worse than none.
 --------------------------------------------------------------------------- */
 :root {
+  /* --- GMB livery -------------------------------------------------------
+     Green was already here as an accent ("green minibus, and 'on the way'").
+     It is now the primary brand surface: jade chrome for the roof, cream for
+     the body. Red keeps its 膠牌 meaning — your destination, and the moment
+     to shout. */
+  --brand: var(--sign-green); /* #0f7a52 */
+  --brand-deep: #0a5738; /* pressed shadow + dark cabin bg */
+  --brand-soft: var(--sign-green-soft); /* #e6f4ee */
+  --brand-on: #a5dcc2; /* subtext on a green header */
+  --brand-rail: #c8e3d6; /* inactive timeline rail */
+
+  /* LED destination board — amber on black, as in the GMB windscreen */
+  --led-bg: #0a0a0a;
+  --led-on: #ffb020;
+  --led-dim: #ff8a00;
+
+  /* Cream body panel: warmer and more saturated than --paper, so the green
+     chrome reads as the roof and this as the body of the bus. */
+  --body-cream: #f2eada;
+
   /* Sign vocabulary */
   --sign-red: #d7263d;
   --sign-red-deep: #a81028;
@@ -47,12 +68,23 @@
   --color-sign-red: var(--sign-red);
   --color-sign-blue: var(--sign-blue);
   --color-sign-green: var(--sign-green);
+  --color-brand: var(--brand);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-on: var(--brand-on);
+  --color-brand-rail: var(--brand-rail);
+  --color-led-bg: var(--led-bg);
+  --color-led-on: var(--led-on);
+  --color-led-dim: var(--led-dim);
+  --color-body-cream: var(--body-cream);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
   --color-paper: var(--paper);
   --color-card: var(--card);
   --color-rule: var(--rule);
   --font-sans: var(--font-archivo);
+  --font-dot: var(--font-dot);
 }
 
 /* Chinese renders in the platform's own HK face — PingFang HK on iOS, Noto
@@ -90,6 +122,57 @@ body {
   border: 3px solid var(--ink);
   border-radius: var(--r-md);
   box-shadow: 0 2px 0 0 var(--ink);
+}
+
+/* --- LED destination board ----------------------------------------------
+   The signature element: amber dot-matrix on black, like the board in a GMB
+   windscreen. Used wherever a rider reads a NUMBER. */
+.led {
+  position: relative;
+  background: var(--led-bg);
+  overflow: hidden;
+  font-family: var(--font-dot), monospace;
+}
+
+/* Breaks the glyphs into dots. Sits over the whole plate and never
+   intercepts taps. */
+.led-dots::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.6) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.6) 0 1px, transparent 1px 3px);
+}
+
+.led-glow {
+  text-shadow: 0 0 14px rgba(255, 176, 32, 0.5);
+}
+
+/* The physical plate treatment — logo only. */
+.led-framed {
+  border: 3px solid var(--ink);
+  box-shadow:
+    0 3px 0 0 var(--ink),
+    inset 0 0 30px rgba(255, 176, 32, 0.14);
+}
+
+/* Long stop names scroll, pausing at each end. */
+@keyframes led-scroll {
+  0%,
+  12% {
+    transform: translateX(0);
+  }
+  88%,
+  100% {
+    transform: translateX(calc(-100% + 210px));
+  }
+}
+.led-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: led-scroll 9s linear infinite;
 }
 
 /* --- Form fields --------------------------------------------------------- */
@@ -143,8 +226,8 @@ body {
 .field-select:focus-visible,
 .field-input:focus-visible {
   outline: none;
-  border-color: var(--sign-blue);
-  box-shadow: 0 0 0 3.5px rgba(18, 80, 126, 0.18);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3.5px rgba(15, 122, 82, 0.15);
 }
 
 /* --- Motion -------------------------------------------------------------- */
@@ -178,10 +261,26 @@ body {
   box-shadow: none !important;
 }
 
+/* The shout button breathes so the eye finds it in a moving cabin. */
+@keyframes shout-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+.shout-breathe {
+  animation: shout-breathe 1.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .stop-pulse,
   .bus-marker,
-  .press {
+  .press,
+  .led-marquee,
+  .shout-breathe {
     animation: none;
     transition: none;
   }

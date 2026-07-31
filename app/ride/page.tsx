@@ -35,9 +35,11 @@ import {
 } from "@/data/languages";
 import type { LucideIcon } from "lucide-react";
 import RideMap from "@/components/RideMap";
+import LedBoard from "@/components/LedBoard";
 import {
   Screen,
   TopBar,
+  BrandPill,
   Segmented,
   Card,
   SectionLabel,
@@ -547,15 +549,18 @@ export default function RidePage() {
     }
     if (
       !boardAlertRef.current &&
-      eta &&
-      eta.etaMinutes.length > 0 &&
-      eta.etaMinutes[0] <= 1
+      etaMins.length > 0 &&
+      etaMins[0] <= 1
     ) {
       boardAlertRef.current = true;
       if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
       speakPhrase("bus-coming", "車嚟喇，準備上車！", personaKey);
     }
   }, [eta, boarded, personaKey]);
+
+  // §7: floor the displayed minute at 1. mm:ss may legitimately show 0:xx,
+  // but "0 分" beside 車嚟緊 reads as a broken readout, not an arriving bus.
+  const etaMins = (eta?.etaMinutes ?? []).map((m) => Math.max(1, m));
 
   // Live minibus ETA (Toolhub transit_eta) at the BOARDING stop — that's
   // where the user is waiting to catch it. Refreshes every 30 s.
@@ -679,15 +684,25 @@ export default function RidePage() {
     <button
       key={p.id}
       onClick={() => speak(p)}
-      className={`card p-3 text-left transition active:scale-95 ${
-        compact ? "min-w-[10.5rem] shrink-0" : ""
+      className={`press rounded-xl p-3 text-left ${
+        compact
+          ? "min-w-[10.5rem] shrink-0 border border-white/20 bg-white/10 text-white"
+          : "card"
       } ${speaking === p.id ? "ring-2 ring-[var(--sign-amber)]" : ""}`}
     >
-      <span className="block text-base font-semibold">{p.cantonese}</span>
+      <span className="sign-zh block text-[15px]">{p.cantonese}</span>
       {coachMode && (
-        <span className="block text-xs text-ink-muted">{p.jyutping}</span>
+        <span
+          className={`block text-xs ${compact ? "text-white/70" : "text-ink-muted"}`}
+        >
+          {p.jyutping}
+        </span>
       )}
-      <span className="block text-xs text-ink-muted">{p.english}</span>
+      <span
+        className={`block text-xs ${compact ? "text-white/70" : "text-ink-muted"}`}
+      >
+        {p.english}
+      </span>
     </button>
   );
 
@@ -818,10 +833,11 @@ export default function RidePage() {
   );
 
   const header = (
-    <TopBar>
+    <TopBar cabin={boarded}>
       {/* Both modes always visible — a field test rode an entire minibus in
           demo mode because the old single chip read as an action. */}
       <Segmented
+        cabin={boarded}
         value={demoMode ? "demo" : "live"}
         onChange={(v) => {
           const demo = v === "demo";
@@ -838,8 +854,14 @@ export default function RidePage() {
       <button
         onClick={() => setCoachMode((c) => !c)}
         aria-pressed={coachMode}
-        className={`min-h-11 rounded-full border-2 border-ink px-3 text-xs font-bold uppercase tracking-wide ${
-          coachMode ? "bg-ink text-white" : "bg-white text-ink-muted"
+        className={`min-h-11 rounded-full px-3 text-xs font-bold uppercase tracking-wide ${
+          boarded
+            ? coachMode
+              ? "bg-white/30 text-white"
+              : "bg-white/15 text-white"
+            : coachMode
+              ? "border-2 border-ink bg-ink text-white"
+              : "border-2 border-ink bg-white text-ink-muted"
         }`}
       >
         {t("common.coach")}
@@ -853,50 +875,47 @@ export default function RidePage() {
   const shoutButton = (
     <button
       onClick={() => speak(primaryPhrase)}
-      className={`press w-full rounded-[var(--r-xl)] text-center text-white ${
-        urgentNow
-          ? "animate-pulse bg-[var(--sign-red)] p-6 shadow-[0_5px_0_0_var(--sign-red-deep)]"
-          : status.state === "approaching"
-            ? "bg-[var(--sign-red)] p-5 shadow-[0_5px_0_0_var(--sign-red-deep)]"
-            : "bg-ink p-5 shadow-[0_5px_0_0_#000]"
+      className={`press w-full rounded-[26px] bg-[var(--sign-red)] px-4 py-[22px] text-center text-white shadow-[0_5px_0_0_var(--sign-red-deep)] ${
+        urgentNow ? "shout-breathe" : ""
       } ${speaking === primaryPhrase.id ? "ring-4 ring-[var(--sign-amber)]" : ""}`}
     >
-      <span
-        className={`sign-zh block ${urgentNow ? "text-[2.75rem]" : "text-[2.25rem]"}`}
-        lang="zh-HK"
-      >
+      <span className="sign-zh block text-[46px]" lang="zh-HK">
         {primaryPhrase.cantonese}
       </span>
       {coachMode && (
-        <span className="mt-1.5 block text-sm font-semibold opacity-85">
+        <span className="mt-1.5 block text-[14px] font-semibold opacity-85">
           {primaryPhrase.jyutping}
         </span>
       )}
-      <span className="mt-1 block text-xs font-medium uppercase tracking-wide opacity-80">
-        {primaryPhrase.english}
-      </span>
     </button>
   );
 
   // ---- Riding: map-first, one primary action pinned in the thumb zone ----
   if (boarded) {
     return (
-      <Screen fill>
+      <Screen fill tone="cabin">
         {header}
 
+        {/* The board in the windscreen: what stop is next. */}
+        <LedBoard
+          size="display"
+          label={`${t("ride.nextStop")} NEXT STOP`}
+          primary={status.nearestStop?.name.tc ?? status.destination?.name.tc ?? ""}
+          secondary={(status.nearestStop ?? status.destination)?.name.en}
+          scroll
+          className="shrink-0"
+        />
         <button
           onClick={() => setBoarded(false)}
-          className="shrink-0 rounded-xl border border-[var(--rule)] bg-white px-3 py-2 text-left text-xs text-ink-muted"
+          className="-mt-1 shrink-0 text-left text-[11px] font-semibold uppercase tracking-wide"
+          style={{ color: "var(--brand-on)" }}
         >
-          {routeName.replace(" (live via Toolhub)", "")}
-          <span className="mt-0.5 block font-medium text-ink">
-            {stops[boardingIdx]?.name.en} → {status.destination?.name.en}
-            <span className="ml-1 font-normal text-[var(--sign-blue)]">· {t("ride.change")}</span>
-          </span>
+          {stops[boardingIdx]?.name.en} → {status.destination?.name.en} · {t("ride.change")}
         </button>
 
         <StatusBanner
           tone={label.tone}
+          cabin
           title={t(label.key)}
           detail={
             status.distanceM !== null && (
@@ -959,6 +978,7 @@ export default function RidePage() {
           destinationSeq={destinationSeq}
           riding
           tall
+          routeCode={routeRef?.routeCode}
           urgent={urgent}
           accuracyM={demoMode ? null : gps.accuracy}
         />
@@ -1020,7 +1040,7 @@ export default function RidePage() {
 
   // ---- Waiting: set up the journey, watch the ETA ----
   return (
-    <Screen>
+    <Screen tone="cream">
       {header}
 
       {/* Destination first: naming a place is what riders can actually do */}
@@ -1189,19 +1209,20 @@ export default function RidePage() {
           value={boardingSeq}
           onChange={(v) => setBoardingSeq(Number(v))}
           hint={
-            eta && eta.etaMinutes.length > 0 ? (
-              <p className="mt-2 rounded-xl border border-[var(--sign-green)]/30 bg-[var(--sign-green-soft)] p-2.5 text-sm text-[var(--sign-green)]">
-                <Bus className="inline size-4 align-[-2px]" aria-hidden /> {t("ride.nextMinibus")}:{" "}
-                <span className="font-semibold">
-                  {eta.etaMinutes
-                    .slice(0, 3)
-                    .map((m) => (m <= 0 ? "now" : `${m} min`))
-                    .join(" · ")}
-                </span>
-                <span className="mt-0.5 block text-xs text-[var(--sign-green)]">
-                  {t("ride.etaLive")}
-                </span>
-              </p>
+            etaMins.length > 0 ? (
+              <div className="mt-2">
+                <LedBoard
+                  size="display"
+                  label={`${routeRef?.routeCode ?? ""} ${t("ride.arriving")} ARRIVING`}
+                  primary={`${etaMins[0]} ${t("ride.minutesUnit")}`}
+                  secondary={
+                    etaMins.length > 1
+                      ? `${t("ride.thenBus")} ${etaMins.slice(1, 3).join(" · ")}`
+                      : undefined
+                  }
+                />
+                <p className="mt-1 text-[11px] text-ink-faint">{t("ride.etaLive")}</p>
+              </div>
             ) : routeLoaded ? (
               <div className="mt-2 rounded-xl bg-[var(--paper)] p-2.5 text-xs text-ink-muted">
                 {t("ride.noArrivals")}
@@ -1293,9 +1314,7 @@ export default function RidePage() {
         riding={false}
         accuracyM={null}
         waitingEtaLabel={
-          eta && eta.etaMinutes.length > 0
-            ? `${eta.etaMinutes[0] <= 0 ? "arriving now" : `${eta.etaMinutes[0]} min`}`
-            : null
+          etaMins.length > 0 ? `${etaMins[0]} min` : null
         }
       />
 

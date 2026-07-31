@@ -31,6 +31,8 @@ type Props = {
   urgent?: boolean;
   /** Taller map for the riding phase */
   tall?: boolean;
+  /** Route code rendered inside the bus marker, in LED amber */
+  routeCode?: string;
 };
 
 export default function RideMap({
@@ -44,10 +46,11 @@ export default function RideMap({
   accuracyM,
   urgent,
   tall,
+  routeCode,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
-  const routeLayerRef = useRef<(CircleMarker | Polyline)[]>([]);
+  const routeLayerRef = useRef<(CircleMarker | Polyline | Marker)[]>([]);
   const busRef = useRef<Marker | null>(null);
   const accuracyRef = useRef<Circle | null>(null);
   const fittedStopsRef = useRef<Stop[] | null>(null);
@@ -133,21 +136,33 @@ export default function RideMap({
 
     const line: [number, number][] =
       path.length >= 2 ? path : stops.map((s) => [s.lat, s.lng]);
-    const poly = L.polyline(line, { color: "#12507e", weight: 5, opacity: 0.85 });
+    const poly = L.polyline(line, { color: "#0f7a52", weight: 7, opacity: 0.9 });
     poly.addTo(map);
     routeLayerRef.current.push(poly);
 
     for (const s of stops) {
       const isBoard = s.seq === boardingSeq;
       const isDest = s.seq === destinationSeq;
-      const marker = L.circleMarker([s.lat, s.lng], {
-        radius: isBoard || isDest ? 8 : 4,
-        color: isBoard ? "#12507e" : isDest ? "#d7263d" : "#12507e",
-        fillColor: isBoard ? "#12507e" : isDest ? "#d7263d" : "#ffffff",
-        fillOpacity: 1,
-        weight: 2,
-        className: isDest && urgent ? "stop-pulse" : undefined,
-      });
+      // Square = your stop, circle = everything else. Matches the timeline.
+      const marker = isDest
+        ? L.marker([s.lat, s.lng], {
+            icon: L.divIcon({
+              className: urgent ? "stop-pulse" : "",
+              html:
+                '<div style="width:20px;height:20px;border-radius:5px;' +
+                'background:#d7263d;border:4px solid #fff;box-sizing:border-box;' +
+                'box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>',
+              iconSize: [20, 20],
+              iconAnchor: [10, 10],
+            }),
+          })
+        : L.circleMarker([s.lat, s.lng], {
+            radius: isBoard ? 10 : 6.5,
+            color: isBoard ? "#ffffff" : "#0f7a52",
+            fillColor: isBoard ? "#0f7a52" : "#ffffff",
+            fillOpacity: 1,
+            weight: isBoard ? 4 : 3,
+          });
       if (isBoard && waitingEtaLabel) {
         marker.bindTooltip(waitingEtaLabel, {
           permanent: true,
@@ -188,9 +203,9 @@ export default function RideMap({
       if (!accuracyRef.current) {
         accuracyRef.current = L.circle([position.lat, position.lng], {
           radius: accuracyM,
-          color: "#12507e",
+          color: "#0f7a52",
           weight: 1,
-          fillColor: "#12507e",
+          fillColor: "#0f7a52",
           fillOpacity: 0.15,
         }).addTo(map);
       } else {
@@ -206,14 +221,15 @@ export default function RideMap({
         icon: L.divIcon({
           className: "bus-marker",
           html:
-            '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" ' +
-            'style="filter:drop-shadow(0 1px 3px rgba(0,0,0,.45))">' +
-            '<rect x="1" y="1" width="22" height="22" rx="7" fill="#d7263d" stroke="#fff" stroke-width="2"/>' +
-            '<path d="M7 8.5h10v5.5H7z" fill="#fff"/>' +
-            '<circle cx="9" cy="16" r="1.5" fill="#fff"/><circle cx="15" cy="16" r="1.5" fill="#fff"/>' +
-            '</svg>',
-          iconSize: [30, 30],
-          iconAnchor: [15, 15],
+            '<div style="width:34px;height:34px;border-radius:10px;' +
+            'background:#0f7a52;border:3px solid #fff;box-sizing:border-box;' +
+            'display:flex;align-items:center;justify-content:center;' +
+            'font-family:var(--font-dot),monospace;font-size:13px;color:#ffb020;' +
+            'box-shadow:0 2px 6px rgba(0,0,0,.4)">' +
+            (routeCode ?? "") +
+            "</div>",
+          iconSize: [34, 34],
+          iconAnchor: [17, 17],
         }),
         zIndexOffset: 1000,
       }).addTo(map);
@@ -231,7 +247,7 @@ export default function RideMap({
     } else {
       map.panTo([position.lat, position.lng], { animate: true });
     }
-  }, [ready, position, riding, accuracyM]);
+  }, [ready, position, riding, accuracyM, routeCode]);
 
   // Two elements on purpose: React styles the outer one, Leaflet owns the
   // inner one. Sharing a single div lets a React re-render overwrite the
@@ -239,7 +255,9 @@ export default function RideMap({
   // tile positioning — the route line still draws, but the map goes white.
   return (
     <div
-      className={`w-full overflow-hidden rounded-2xl border-2 border-ink bg-[var(--rule)] ${
+      className={`w-full overflow-hidden rounded-[18px] bg-[var(--rule)] ${
+        tall ? "border-[2.5px] border-ink" : "border border-[var(--rule)]"
+      } ${
         tall ? "h-full min-h-40 flex-1" : "h-52"
       }`}
     >

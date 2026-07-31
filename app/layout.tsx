@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Archivo } from "next/font/google";
+import { Archivo, DotGothic16 } from "next/font/google";
 import "./globals.css";
 import "leaflet/dist/leaflet.css";
 import { LanguageProvider } from "@/lib/i18n";
@@ -10,6 +10,16 @@ const archivo = Archivo({
   variable: "--font-archivo",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800", "900"],
+  display: "swap",
+});
+
+// The LED destination board. A 16px bitmap face — never bolded, never
+// letter-spaced in Chinese. Only ever renders route codes, times, stop names
+// and short labels.
+const dot = DotGothic16({
+  variable: "--font-dot",
+  subsets: ["latin"],
+  weight: "400",
   display: "swap",
 });
 
@@ -26,7 +36,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: "#d7263d",
+  themeColor: "#0f7a52",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5, // never trap a user who needs to zoom
@@ -38,7 +48,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${archivo.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${archivo.variable} ${dot.variable} h-full antialiased`}
+    >
       <body className="flex min-h-full flex-col">
         <LanguageProvider>{children}</LanguageProvider>
       </body>
