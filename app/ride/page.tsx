@@ -800,17 +800,29 @@ export default function RidePage() {
         ← Yau Lok!
       </Link>
       <div className="flex gap-2 text-xs">
-        <button
-          onClick={() => {
-            setDemoMode((d) => !d);
-            sim.reset();
-          }}
-          className={`rounded-full px-3 py-1.5 font-medium ${
-            demoMode ? "bg-indigo-600 text-white" : "bg-slate-900 text-white"
-          }`}
-        >
-          {demoMode ? "Demo ride" : "Live GPS"}
-        </button>
+        {/* Segmented, not a single chip: the old control showed only the
+            current mode, which reads as the action it would perform. A
+            field test rode an entire minibus in demo mode. */}
+        <span className="inline-flex overflow-hidden rounded-full border border-slate-300">
+          {([true, false] as const).map((demo) => (
+            <button
+              key={String(demo)}
+              onClick={() => {
+                if (demoMode === demo) return;
+                setDemoMode(demo);
+                setBoarded(false);
+                sim.reset();
+              }}
+              className={`px-3 py-1.5 font-medium ${
+                demoMode === demo
+                  ? "bg-slate-900 text-white"
+                  : "bg-white text-slate-500"
+              }`}
+            >
+              {demo ? t("common.demoRide") : t("common.liveGps")}
+            </button>
+          ))}
+        </span>
         <button
           onClick={() => setCoachMode((c) => !c)}
           className={`rounded-full px-3 py-1.5 font-medium ${
@@ -1293,11 +1305,44 @@ export default function RidePage() {
         </p>
       )}
 
+      {demoMode ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="font-semibold">{t("ride.demoBanner")}</p>
+          <button
+            onClick={() => {
+              setDemoMode(false);
+              setBoarded(false);
+              sim.reset();
+            }}
+            className="mt-1.5 w-full rounded-lg bg-amber-900 py-2 font-semibold text-white transition active:scale-95"
+          >
+            {t("ride.switchLive")}
+          </button>
+        </div>
+      ) : (
+        <div
+          className={`rounded-xl p-3 text-sm ${
+            gps.error
+              ? "border border-red-200 bg-red-50 text-red-800"
+              : gps.position
+                ? "border border-emerald-200 bg-emerald-50 text-emerald-900"
+                : "border border-slate-200 bg-slate-50 text-slate-600"
+          }`}
+        >
+          {gps.error
+            ? `GPS: ${gps.error}`
+            : gps.position
+              ? `${t("ride.gpsReady")} · ±${Math.round(gps.accuracy ?? 0)} m`
+              : t("ride.gpsSearching")}
+        </div>
+      )}
+
       <button
         onClick={() => setBoarded(true)}
-        className="rounded-2xl bg-indigo-600 p-5 text-center text-lg font-semibold text-white shadow-lg transition active:scale-95"
+        disabled={!demoMode && !gps.position}
+        className="rounded-2xl bg-indigo-600 p-5 text-center text-lg font-semibold text-white shadow-lg transition active:scale-95 disabled:opacity-50"
       >
-        🚐 {t("ride.onBoard")}
+        🚐 {demoMode ? t("ride.startDemo") : t("ride.onBoard")}
         <span className="mt-0.5 block text-sm font-normal opacity-85">
           {t("ride.waitingAt")} {stops[boardingIdx]?.name.en}
         </span>

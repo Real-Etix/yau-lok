@@ -87,5 +87,10 @@
   "common.coach": "Coach",
   "common.demoRide": "Demo ride",
   "common.liveGps": "Live GPS",
-  "common.back": "Back"
+  "common.back": "Back",
+  "ride.demoBanner": "Demo mode — the bus movement is simulated, your real location is not used.",
+  "ride.switchLive": "Switch to Live GPS for a real ride",
+  "ride.startDemo": "Start the simulated ride",
+  "ride.gpsReady": "GPS ready",
+  "ride.gpsSearching": "Searching for GPS… step near a window or outside."
 }
