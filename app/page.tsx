@@ -14,7 +14,7 @@ const SCENARIOS = [
 export default function Home() {
   const t = useT();
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-6">
+    <main className="mx-auto flex min-h-dvh w-full min-w-0 max-w-md flex-col gap-6 overflow-x-hidden p-6">
       <header className="pt-10 text-center">
         <p className="text-6xl font-black leading-none tracking-tight text-red-600">
           有落!

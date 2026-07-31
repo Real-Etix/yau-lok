@@ -122,7 +122,7 @@ export default function ClinicPage() {
   }, [runSay, langCode]);
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 p-4">
+    <main className="mx-auto flex min-h-dvh w-full min-w-0 max-w-md flex-col gap-4 overflow-x-hidden p-4">
       <header className="flex items-center justify-between">
         <Link href="/" className="text-sm font-medium text-slate-500">
           ← Yau Lok!

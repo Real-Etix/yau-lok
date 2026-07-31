@@ -867,7 +867,7 @@ export default function RidePage() {
   // ---- Riding: map-first, one primary action pinned in the thumb zone ----
   if (boarded) {
     return (
-      <main className="mx-auto flex h-dvh max-w-md flex-col gap-3 overflow-x-hidden p-4">
+      <main className="mx-auto flex h-dvh w-full min-w-0 max-w-md flex-col gap-3 overflow-x-hidden p-4">
         {header}
 
         <button
@@ -1003,7 +1003,7 @@ export default function RidePage() {
 
   // ---- Waiting: set up the journey, watch the ETA ----
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 p-4">
+    <main className="mx-auto flex min-h-dvh w-full min-w-0 max-w-md flex-col gap-4 overflow-x-hidden p-4">
       {header}
 
       {/* Destination first: naming a place is what riders can actually do */}
@@ -1350,7 +1350,7 @@ export default function RidePage() {
 
       {/* Secondary tools stay one tap away instead of stacked on the page */}
       <section>
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+        <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 pb-1">
           {TOOLS.map((tool) => (
             <button
               key={tool.id}
