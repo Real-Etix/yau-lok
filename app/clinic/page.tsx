@@ -12,6 +12,9 @@ import {
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { getAeWaits, type AeHospital } from "@/lib/toolhub";
 import { friendlyMicError, listenUserSpeech, speakCantonese } from "@/lib/speech";
+import { Screen, TopBar, Card, SectionLabel } from "@/components/ui";
+import { Pencil, Mic, Volume2, Globe, Lightbulb } from "lucide-react";
+import { useT } from "@/lib/i18n";
 
 type SayResult = {
   cantonese: string;
@@ -28,6 +31,7 @@ const GROUPS: { id: ClinicPhrase["group"]; label: string }[] = [
 ];
 
 export default function ClinicPage() {
+  const t = useT();
   const [personaKey, setPersonaKey] = useState(DEFAULT_PERSONA_KEY);
   const [coach, setCoach] = useState(true);
   const [langCode, setLangCode] = useState(DEFAULT_LANGUAGE_CODE);
@@ -122,37 +126,35 @@ export default function ClinicPage() {
   }, [runSay, langCode]);
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full min-w-0 max-w-md flex-col gap-4 overflow-x-hidden p-4">
-      <header className="flex items-center justify-between">
-        <Link href="/" className="text-sm font-medium text-slate-500">
-          ← Yau Lok!
-        </Link>
+    <Screen>
+      <TopBar>
         <button
           onClick={() => setCoach((c) => !c)}
-          className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-            coach ? "bg-teal-600 text-white" : "bg-slate-200 text-slate-700"
+          aria-pressed={coach}
+          className={`min-h-11 rounded-full border-2 border-ink px-3 text-xs font-bold uppercase tracking-wide ${
+            coach ? "bg-ink text-white" : "bg-white text-ink-muted"
           }`}
         >
-          Coach
+          {t("common.coach")}
         </button>
-      </header>
+      </TopBar>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <p className="text-sm font-semibold">🏥 Clinic &amp; counters</p>
-        <p className="mt-0.5 text-xs text-slate-500">
+      <section className="card p-4">
+        <p className="text-base font-extrabold">{t("clinic.title")}</p>
+        <p className="mt-0.5 text-xs text-ink-muted">
           Say what&apos;s wrong, ask what happens next, and see where the wait
           is shortest.
         </p>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <section className="card p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
           A&amp;E waiting times {gps.position ? "· nearest first" : "· all"}
         </p>
         {loadingWaits && (
           <div className="mt-2 space-y-2">
-            <div className="h-12 animate-pulse rounded-lg bg-slate-100" />
-            <div className="h-12 animate-pulse rounded-lg bg-slate-100" />
+            <div className="h-12 animate-pulse rounded-lg bg-[var(--paper)]" />
+            <div className="h-12 animate-pulse rounded-lg bg-[var(--paper)]" />
           </div>
         )}
         {hospitals && !loadingWaits && (
@@ -160,17 +162,17 @@ export default function ClinicPage() {
             {hospitals.slice(0, 4).map((h) => (
               <li
                 key={h.id}
-                className="rounded-lg bg-slate-50 p-2.5 text-sm"
+                className="rounded-lg bg-[var(--paper)] p-2.5 text-sm"
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="min-w-0 truncate font-medium">{h.name}</span>
                   {h.wait && (
-                    <span className="shrink-0 font-semibold text-slate-900">
+                    <span className="shrink-0 font-semibold text-ink">
                       ~{h.wait}
                     </span>
                   )}
                 </div>
-                <span className="block text-xs text-slate-500">
+                <span className="block text-xs text-ink-muted">
                   {h.district}
                   {h.distanceM !== null &&
                     ` · ${(h.distanceM / 1000).toFixed(1)} km`}
@@ -180,25 +182,23 @@ export default function ClinicPage() {
             ))}
           </ul>
         )}
-        <p className="mt-2 text-xs text-slate-400">
+        <p className="mt-2 text-xs text-ink-faint">
           Hospital Authority data via HKGAI Toolhub. Headline figures are the
           median wait for less urgent cases — genuine emergencies are seen
           first. In an emergency call 999.
         </p>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <section className="card p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
           Say anything · AI
         </p>
         <label className="mt-2 block">
-          <span className="mb-1 block text-xs font-medium text-slate-600">
+          <span className="mb-1 block text-xs font-medium text-ink-muted">
             I speak
           </span>
           <span className="field">
-            <span aria-hidden className="field-icon">
-              🌏
-            </span>
+            <span className="field-icon"><Globe className="size-5" aria-hidden strokeWidth={2.2} /></span>
             <select
               className="field-select"
               value={langCode}
@@ -220,20 +220,18 @@ export default function ClinicPage() {
           onClick={sayByVoice}
           disabled={sayListening || sayLoading}
           className={`mt-2 w-full rounded-xl p-3.5 text-center font-semibold text-white transition active:scale-95 disabled:opacity-70 ${
-            sayListening ? "animate-pulse bg-red-600" : "bg-indigo-600"
+            sayListening ? "animate-pulse bg-[var(--sign-red)]" : "bg-[var(--sign-blue)]"
           }`}
         >
           {sayListening
-            ? "🔴 Listening… speak now"
+            ? t("say.listening")
             : sayLoading
               ? "Translating…"
-              : "🎙️ Describe it in your language"}
+              : t("clinic.describe")}
         </button>
         <div className="mt-2 flex gap-2">
           <span className="field min-w-0 flex-1">
-            <span aria-hidden className="field-icon">
-              ✍️
-            </span>
+            <span className="field-icon"><Pencil className="size-5" aria-hidden strokeWidth={2.2} /></span>
             <input
               className="field-input"
               placeholder="…or type it — any language"
@@ -245,16 +243,16 @@ export default function ClinicPage() {
           <button
             onClick={() => runSay(sayText)}
             disabled={sayLoading || sayListening || !sayText.trim()}
-            className="rounded-xl bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
+            className="rounded-xl bg-ink px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
           >
             {sayLoading ? "…" : "Say it"}
           </button>
         </div>
-        {sayError && <p className="mt-2 text-sm text-red-600">{sayError}</p>}
+        {sayError && <p className="mt-2 text-sm text-[var(--sign-red)]">{sayError}</p>}
         {sayResult && (
           <button
             onClick={() => speakCantonese(sayResult.cantonese, personaKey)}
-            className="mt-2 w-full rounded-xl bg-slate-900 p-3 text-center text-white transition active:scale-95"
+            className="mt-2 w-full rounded-xl bg-ink p-3 text-center text-white transition active:scale-95"
           >
             <span className="block text-2xl font-bold">
               {sayResult.cantonese}
@@ -270,13 +268,13 @@ export default function ClinicPage() {
           </button>
         )}
         {sayResult?.note && (
-          <p className="mt-1.5 text-xs text-slate-500">💡 {sayResult.note}</p>
+          <p className="mt-1.5 flex gap-1.5 text-xs text-ink-muted"><Lightbulb className="size-4 shrink-0" aria-hidden />{sayResult.note}</p>
         )}
       </section>
 
       {GROUPS.map((g) => (
         <section key={g.id}>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-muted">
             {g.label}
           </p>
           <div className="space-y-2">
@@ -284,19 +282,19 @@ export default function ClinicPage() {
               <button
                 key={p.id}
                 onClick={() => speak(p)}
-                className={`w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition active:scale-95 ${
-                  speaking === p.id ? "ring-2 ring-amber-400" : ""
+                className={`w-full card p-3 text-left transition active:scale-95 ${
+                  speaking === p.id ? "ring-2 ring-[var(--sign-amber)]" : ""
                 }`}
               >
                 <span className="block text-base font-semibold">
                   {p.cantonese}
                 </span>
                 {coach && (
-                  <span className="block text-xs text-slate-500">
+                  <span className="block text-xs text-ink-muted">
                     {p.jyutping}
                   </span>
                 )}
-                <span className="block text-xs text-slate-500">
+                <span className="block text-xs text-ink-muted">
                   {p.english}
                 </span>
               </button>
@@ -305,10 +303,10 @@ export default function ClinicPage() {
         </section>
       ))}
 
-      <p className="pb-4 text-center text-xs text-slate-400">
+      <p className="pb-4 text-center text-xs text-ink-faint">
         Cantonese spoken by HKGAI · waiting times from Hospital Authority open
         data
       </p>
-    </main>
+    </Screen>
   );
 }

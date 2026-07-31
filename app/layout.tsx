@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Archivo } from "next/font/google";
 import "./globals.css";
 import "leaflet/dist/leaflet.css";
 import { LanguageProvider } from "@/lib/i18n";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// One Latin family, used from 400 to 900. The heavy weights carry the sign
+// lettering; Chinese falls through to the platform's own HK face.
+const archivo = Archivo({
+  variable: "--font-archivo",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -19,7 +18,6 @@ export const metadata: Metadata = {
   description:
     "Situated Cantonese copilot for Hong Kong — never miss your minibus stop again.",
   manifest: "/manifest.json",
-  // Full-screen when installed to the iOS home screen
   appleWebApp: {
     capable: true,
     title: "Yau Lok!",
@@ -28,10 +26,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: "#dc2626",
+  themeColor: "#d7263d",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  maximumScale: 5, // never trap a user who needs to zoom
 };
 
 export default function RootLayout({
@@ -40,11 +38,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">
+    <html lang="en" className={`${archivo.variable} h-full antialiased`}>
+      <body className="flex min-h-full flex-col">
         <LanguageProvider>{children}</LanguageProvider>
       </body>
     </html>

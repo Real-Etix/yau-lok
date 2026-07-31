@@ -33,7 +33,38 @@ import {
   DEFAULT_LANGUAGE_CODE,
   getLanguage,
 } from "@/data/languages";
+import type { LucideIcon } from "lucide-react";
 import RideMap from "@/components/RideMap";
+import {
+  Screen,
+  TopBar,
+  Segmented,
+  Card,
+  SectionLabel,
+  PressButton,
+  StatusBanner,
+} from "@/components/ui";
+import {
+  Bus,
+  MapPin,
+  Flag,
+  Mic,
+  Pencil,
+  Volume2,
+  MessagesSquare,
+  Toilet,
+  Signpost,
+  Target,
+  PersonStanding,
+  Coins,
+  Umbrella,
+  CloudSun,
+  RotateCcw,
+  Radio,
+  Lightbulb,
+  ShoppingBasket,
+  Globe,
+} from "lucide-react";
 import { useT } from "@/lib/i18n";
 import SelectField from "@/components/SelectField";
 import { haversineMeters, lerp, type LatLng } from "@/lib/geo";
@@ -45,20 +76,14 @@ import {
   speakPhrase,
 } from "@/lib/speech";
 
-const STATE_LABEL: Record<RideState, { key: string; className: string }> = {
-  riding: { key: "ride.onTheWay", className: "bg-emerald-100 text-emerald-900" },
-  approaching: {
-    key: "ride.comingUp",
-    className: "bg-amber-200 text-amber-950",
-  },
-  arrive_now: {
-    key: "ride.shoutNow",
-    className: "bg-red-500 text-white animate-pulse",
-  },
-  arrived: {
-    key: "ride.arrived",
-    className: "bg-slate-200 text-slate-800",
-  },
+const STATE_LABEL: Record<
+  RideState,
+  { key: string; tone: "green" | "amber" | "red" | "neutral" }
+> = {
+  riding: { key: "ride.onTheWay", tone: "green" },
+  approaching: { key: "ride.comingUp", tone: "amber" },
+  arrive_now: { key: "ride.shoutNow", tone: "red" },
+  arrived: { key: "ride.arrived", tone: "neutral" },
 };
 
 type DriverReply = {
@@ -70,12 +95,12 @@ type DriverReply = {
 
 type ToolId = "phrases" | "say" | "listen" | "nearby" | "voice";
 
-const TOOLS: { id: ToolId; key: string; emoji: string }[] = [
-  { id: "phrases", key: "tool.askDriver", emoji: "🗣️" },
-  { id: "say", key: "tool.sayAnything", emoji: "✍️" },
-  { id: "listen", key: "tool.listen", emoji: "🎤" },
-  { id: "nearby", key: "tool.nearby", emoji: "🚻" },
-  { id: "voice", key: "tool.voice", emoji: "🔊" },
+const TOOLS: { id: ToolId; key: string; Icon: LucideIcon }[] = [
+  { id: "phrases", key: "tool.askDriver", Icon: MessagesSquare },
+  { id: "say", key: "tool.sayAnything", Icon: Pencil },
+  { id: "listen", key: "tool.listen", Icon: Mic },
+  { id: "nearby", key: "tool.nearby", Icon: Toilet },
+  { id: "voice", key: "tool.voice", Icon: Volume2 },
 ];
 
 type SayResult = {
@@ -654,36 +679,34 @@ export default function RidePage() {
     <button
       key={p.id}
       onClick={() => speak(p)}
-      className={`rounded-xl border border-slate-200 bg-white p-3 text-left transition active:scale-95 ${
+      className={`card p-3 text-left transition active:scale-95 ${
         compact ? "min-w-[10.5rem] shrink-0" : ""
-      } ${speaking === p.id ? "ring-2 ring-amber-400" : ""}`}
+      } ${speaking === p.id ? "ring-2 ring-[var(--sign-amber)]" : ""}`}
     >
       <span className="block text-base font-semibold">{p.cantonese}</span>
       {coachMode && (
-        <span className="block text-xs text-slate-500">{p.jyutping}</span>
+        <span className="block text-xs text-ink-muted">{p.jyutping}</span>
       )}
-      <span className="block text-xs text-slate-500">{p.english}</span>
+      <span className="block text-xs text-ink-muted">{p.english}</span>
     </button>
   );
 
   const composer = (
-    <section className="rounded-2xl border border-slate-200 bg-white p-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+    <section className="card p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
         Say anything · AI
       </p>
-      <p className="mt-0.5 text-xs text-slate-500">
+      <p className="mt-0.5 text-xs text-ink-muted">
         Speak or type in your own language — HKGAI turns it into what a local
         would actually say, then says it out loud for you.
       </p>
 
       <label className="mt-2 block">
-        <span className="mb-1 block text-xs font-medium text-slate-600">
+        <span className="mb-1 block text-xs font-medium text-ink-muted">
           I speak
         </span>
         <span className="field">
-          <span aria-hidden className="field-icon">
-            🌏
-          </span>
+          <span className="field-icon"><Globe className="size-5" aria-hidden strokeWidth={2.2} /></span>
           <select
             className="field-select"
             value={langCode}
@@ -703,21 +726,21 @@ export default function RidePage() {
         disabled={sayListening || sayLoading}
         className={`mt-2 w-full rounded-xl p-3.5 text-center font-semibold transition active:scale-95 disabled:opacity-70 ${
           sayListening
-            ? "animate-pulse bg-red-600 text-white"
-            : "bg-indigo-600 text-white"
+            ? "animate-pulse bg-[var(--sign-red)] text-white"
+            : "bg-[var(--sign-blue)] text-white"
         }`}
       >
         {sayListening
-          ? "🔴 Listening… speak now"
+          ? t("say.listening")
           : sayLoading
             ? "Translating…"
-            : "🎙️ Hold a thought — speak it"}
+            : t("say.speak")}
       </button>
 
       <div className="mt-2 flex gap-2">
         <span className="field min-w-0 flex-1">
-          <span aria-hidden className="field-icon">
-            ✍️
+          <span className="field-icon">
+            <Pencil className="size-5" aria-hidden strokeWidth={2.2} />
           </span>
           <input
             className="field-input"
@@ -730,16 +753,16 @@ export default function RidePage() {
         <button
           onClick={sayIt}
           disabled={sayLoading || sayListening || !sayText.trim()}
-          className="rounded-xl bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
+          className="rounded-xl bg-ink px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
         >
           {sayLoading ? "…" : "Say it"}
         </button>
       </div>
-      {sayError && <p className="mt-2 text-sm text-red-600">{sayError}</p>}
+      {sayError && <p className="mt-2 text-sm text-[var(--sign-red)]">{sayError}</p>}
       {sayResult && (
         <button
           onClick={() => speakCantonese(sayResult.cantonese, personaKey)}
-          className="mt-2 w-full rounded-xl bg-slate-900 p-3 text-center text-white transition active:scale-95"
+          className="mt-2 w-full rounded-xl bg-ink p-3 text-center text-white transition active:scale-95"
         >
           <span className="block text-2xl font-bold">
             {sayResult.cantonese}
@@ -755,36 +778,36 @@ export default function RidePage() {
         </button>
       )}
       {sayResult?.note && (
-        <p className="mt-1.5 text-xs text-slate-500">💡 {sayResult.note}</p>
+        <p className="mt-1.5 flex gap-1.5 text-xs text-ink-muted"><Lightbulb className="size-4 shrink-0" aria-hidden />{sayResult.note}</p>
       )}
     </section>
   );
 
   const micPanel = (
-    <section className="rounded-2xl border border-slate-200 bg-white p-3">
+    <section className="card p-3">
       <button
         onClick={listenToDriver}
         disabled={listening}
-        className="w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white transition active:scale-95 disabled:opacity-60"
+        className="w-full rounded-xl bg-[var(--sign-blue)] p-3 font-semibold text-white transition active:scale-95 disabled:opacity-60"
       >
-        {listening ? "Listening…" : "🎤 The driver said something"}
+        <span className="flex items-center justify-center gap-2"><Mic className="size-4" aria-hidden />{listening ? t("say.listening") : t("mic.driverSaid")}</span>
       </button>
-      {listenError && <p className="mt-2 text-sm text-red-600">{listenError}</p>}
+      {listenError && <p className="mt-2 text-sm text-[var(--sign-red)]">{listenError}</p>}
       {driverReply && (
         <div className="mt-3 space-y-2 text-sm">
-          <p className="text-slate-500">Heard: {driverReply.transcript}</p>
+          <p className="text-ink-muted">Heard: {driverReply.transcript}</p>
           <p className="font-semibold">{driverReply.english}</p>
           {driverReply.reply_cantonese && (
             <button
               onClick={() =>
                 speakCantonese(driverReply.reply_cantonese, personaKey)
               }
-              className="w-full rounded-lg bg-slate-100 p-2 text-left"
+              className="w-full rounded-lg bg-[var(--paper)] p-2 text-left"
             >
               <span className="block font-semibold">
                 Reply: {driverReply.reply_cantonese}
               </span>
-              <span className="block text-xs text-slate-500">
+              <span className="block text-xs text-ink-muted">
                 {driverReply.reply_english} · tap to speak
               </span>
             </button>
@@ -795,71 +818,62 @@ export default function RidePage() {
   );
 
   const header = (
-    <header className="flex shrink-0 items-center justify-between">
-      <Link href="/" className="text-sm font-medium text-slate-500">
-        ← Yau Lok!
-      </Link>
-      <div className="flex gap-2 text-xs">
-        {/* Segmented, not a single chip: the old control showed only the
-            current mode, which reads as the action it would perform. A
-            field test rode an entire minibus in demo mode. */}
-        <span className="inline-flex overflow-hidden rounded-full border border-slate-300">
-          {([true, false] as const).map((demo) => (
-            <button
-              key={String(demo)}
-              onClick={() => {
-                if (demoMode === demo) return;
-                setDemoMode(demo);
-                setBoarded(false);
-                sim.reset();
-              }}
-              className={`px-3 py-1.5 font-medium ${
-                demoMode === demo
-                  ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-500"
-              }`}
-            >
-              {demo ? t("common.demoRide") : t("common.liveGps")}
-            </button>
-          ))}
-        </span>
-        <button
-          onClick={() => setCoachMode((c) => !c)}
-          className={`rounded-full px-3 py-1.5 font-medium ${
-            coachMode ? "bg-teal-600 text-white" : "bg-slate-200 text-slate-700"
-          }`}
-        >
-          Coach
-        </button>
-      </div>
-    </header>
+    <TopBar>
+      {/* Both modes always visible — a field test rode an entire minibus in
+          demo mode because the old single chip read as an action. */}
+      <Segmented
+        value={demoMode ? "demo" : "live"}
+        onChange={(v) => {
+          const demo = v === "demo";
+          if (demoMode === demo) return;
+          setDemoMode(demo);
+          setBoarded(false);
+          sim.reset();
+        }}
+        options={[
+          { value: "demo", label: t("common.demoRide") },
+          { value: "live", label: t("common.liveGps") },
+        ]}
+      />
+      <button
+        onClick={() => setCoachMode((c) => !c)}
+        aria-pressed={coachMode}
+        className={`min-h-11 rounded-full border-2 border-ink px-3 text-xs font-bold uppercase tracking-wide ${
+          coachMode ? "bg-ink text-white" : "bg-white text-ink-muted"
+        }`}
+      >
+        {t("common.coach")}
+      </button>
+    </TopBar>
   );
 
+  // The one thing the whole product exists for. Styled as a physical stop
+  // button: it sits proud of the page and depresses when pressed.
+  const urgentNow = status.state === "arrive_now";
   const shoutButton = (
     <button
       onClick={() => speak(primaryPhrase)}
-      className={`w-full rounded-3xl text-center shadow-lg transition active:scale-95 ${
-        status.state === "arrive_now"
-          ? "animate-pulse bg-red-600 p-7 text-white"
+      className={`press w-full rounded-[var(--r-xl)] text-center text-white ${
+        urgentNow
+          ? "animate-pulse bg-[var(--sign-red)] p-6 shadow-[0_5px_0_0_var(--sign-red-deep)]"
           : status.state === "approaching"
-            ? "bg-red-600 p-6 text-white"
-            : "bg-slate-900 p-5 text-white"
-      } ${speaking === primaryPhrase.id ? "ring-4 ring-amber-400" : ""}`}
+            ? "bg-[var(--sign-red)] p-5 shadow-[0_5px_0_0_var(--sign-red-deep)]"
+            : "bg-ink p-5 shadow-[0_5px_0_0_#000]"
+      } ${speaking === primaryPhrase.id ? "ring-4 ring-[var(--sign-amber)]" : ""}`}
     >
       <span
-        className={`block font-bold ${
-          status.state === "arrive_now" ? "text-4xl" : "text-3xl"
-        }`}
+        className={`sign-zh block ${urgentNow ? "text-[2.75rem]" : "text-[2.25rem]"}`}
+        lang="zh-HK"
       >
         {primaryPhrase.cantonese}
       </span>
       {coachMode && (
-        <span className="mt-1 block text-sm opacity-80">
+        <span className="mt-1.5 block text-sm font-semibold opacity-85">
           {primaryPhrase.jyutping}
         </span>
       )}
-      <span className="mt-1 block text-sm opacity-80">
-        {primaryPhrase.english} · tap to speak for me
+      <span className="mt-1 block text-xs font-medium uppercase tracking-wide opacity-80">
+        {primaryPhrase.english}
       </span>
     </button>
   );
@@ -867,26 +881,26 @@ export default function RidePage() {
   // ---- Riding: map-first, one primary action pinned in the thumb zone ----
   if (boarded) {
     return (
-      <main className="mx-auto flex h-dvh w-full min-w-0 max-w-md flex-col gap-3 overflow-x-hidden p-4">
+      <Screen fill>
         {header}
 
         <button
           onClick={() => setBoarded(false)}
-          className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-xs text-slate-500"
+          className="shrink-0 rounded-xl border border-[var(--rule)] bg-white px-3 py-2 text-left text-xs text-ink-muted"
         >
           {routeName.replace(" (live via Toolhub)", "")}
-          <span className="mt-0.5 block font-medium text-slate-800">
+          <span className="mt-0.5 block font-medium text-ink">
             {stops[boardingIdx]?.name.en} → {status.destination?.name.en}
-            <span className="ml-1 font-normal text-indigo-600">· {t("ride.change")}</span>
+            <span className="ml-1 font-normal text-[var(--sign-blue)]">· {t("ride.change")}</span>
           </span>
         </button>
 
-        <section
-          className={`shrink-0 rounded-2xl p-3 text-center font-semibold ${label.className}`}
-        >
-          <p className="text-lg">{t(label.key)}</p>
-          {status.distanceM !== null && (
-            <p className="mt-0.5 text-sm font-normal">
+        <StatusBanner
+          tone={label.tone}
+          title={t(label.key)}
+          detail={
+            status.distanceM !== null && (
+              <span className="block">
               {status.etaMinutes !== null &&
                 status.state !== "arrived" &&
                 status.state !== "arrive_now" && (
@@ -906,14 +920,17 @@ export default function RidePage() {
                 status.state !== "arrived" && (
                   <>
                     {" "}
-                    · <span className="font-semibold">
-                      {stopsToGo} {stopsToGo === 1 ? "stop" : "stops"} to go
+                    · <span className="font-bold">
+                      {stopsToGo}{" "}
+                      {stopsToGo === 1 ? t("ride.stopToGo") : t("ride.stopsToGo")}
                     </span>
                   </>
                 )}
-            </p>
-          )}
-          <p className="mt-0.5 text-xs font-normal opacity-70">
+              </span>
+            )
+          }
+        >
+          <p className="mt-1 text-xs font-medium opacity-75">
             {demoMode
               ? `simulated · ${Math.round(sim.progress * 100)}% · ${SIM_SPEED_KMH} km/h at ×${SIM_TIMELAPSE}`
               : gps.position
@@ -927,12 +944,12 @@ export default function RidePage() {
                 setReachedStop(false);
                 sim.reset();
               }}
-              className="mt-2 rounded-lg bg-white/70 px-3 py-1.5 text-sm font-medium"
+              className="press mx-auto mt-2 flex min-h-11 items-center gap-1.5 rounded-full border-2 border-current px-4 text-sm font-bold"
             >
-              ↺ {t("ride.newRide")}
+              <RotateCcw className="size-4" aria-hidden /> {t("ride.newRide")}
             </button>
           )}
-        </section>
+        </StatusBanner>
 
         <RideMap
           stops={stops}
@@ -955,11 +972,11 @@ export default function RidePage() {
               onClick={() => setComposerOpen((o) => !o)}
               className={`min-w-[10.5rem] shrink-0 rounded-xl p-3 text-left text-sm font-semibold transition active:scale-95 ${
                 composerOpen
-                  ? "bg-slate-900 text-white"
-                  : "border border-slate-200 bg-white"
+                  ? "bg-ink text-white"
+                  : "border border-[var(--rule)] bg-white"
               }`}
             >
-              ✍️ Say something else
+              Say something else
               <span className="mt-0.5 block text-xs font-normal opacity-70">
                 type it, AI speaks it
               </span>
@@ -967,26 +984,26 @@ export default function RidePage() {
             <button
               onClick={listenToDriver}
               disabled={listening}
-              className="min-w-[10.5rem] shrink-0 rounded-xl bg-indigo-600 p-3 text-left text-sm font-semibold text-white transition active:scale-95 disabled:opacity-60"
+              className="min-w-[10.5rem] shrink-0 rounded-xl bg-[var(--sign-blue)] p-3 text-left text-sm font-semibold text-white transition active:scale-95 disabled:opacity-60"
             >
-              {listening ? "Listening…" : "🎤 Driver said something"}
+              <span className="flex items-center gap-1.5"><Mic className="size-4" aria-hidden />{listening ? t("say.listening") : t("mic.driverSaid")}</span>
             </button>
           </div>
           {composerOpen && composer}
           {driverReply && (
-            <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
+            <div className="card p-3 text-sm">
               <p className="font-semibold">{driverReply.english}</p>
               {driverReply.reply_cantonese && (
                 <button
                   onClick={() =>
                     speakCantonese(driverReply.reply_cantonese, personaKey)
                   }
-                  className="mt-1 w-full rounded-lg bg-slate-100 p-2 text-left"
+                  className="mt-1 w-full rounded-lg bg-[var(--paper)] p-2 text-left"
                 >
                   <span className="block font-semibold">
                     Reply: {driverReply.reply_cantonese}
                   </span>
-                  <span className="block text-xs text-slate-500">
+                  <span className="block text-xs text-ink-muted">
                     {driverReply.reply_english} · tap to speak
                   </span>
                 </button>
@@ -994,29 +1011,27 @@ export default function RidePage() {
             </div>
           )}
           {listenError && (
-            <p className="text-center text-sm text-red-600">{listenError}</p>
+            <p className="text-center text-sm text-[var(--sign-red)]">{listenError}</p>
           )}
         </div>
-      </main>
+      </Screen>
     );
   }
 
   // ---- Waiting: set up the journey, watch the ETA ----
   return (
-    <main className="mx-auto flex min-h-dvh w-full min-w-0 max-w-md flex-col gap-4 overflow-x-hidden p-4">
+    <Screen>
       {header}
 
       {/* Destination first: naming a place is what riders can actually do */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <p className="text-sm font-semibold">{t("ride.whereTo")}</p>
-        <p className="mt-0.5 text-xs text-slate-500">
+        <p className="mt-0.5 text-xs text-ink-muted">
           {t("ride.whereToHint")}
         </p>
         {!gps.position && (
           <span className="field mt-2 block">
-            <span aria-hidden className="field-icon">
-              🧍
-            </span>
+            <span className="field-icon"><PersonStanding className="size-5" aria-hidden strokeWidth={2.2} /></span>
             <input
               className="field-input"
               placeholder={t("ride.from")}
@@ -1028,8 +1043,8 @@ export default function RidePage() {
         )}
         <div className="mt-2 flex gap-2">
           <span className="field min-w-0 flex-1">
-            <span aria-hidden className="field-icon">
-              🎯
+            <span className="field-icon">
+              <Target className="size-5" aria-hidden strokeWidth={2.2} />
             </span>
             <input
               className="field-input"
@@ -1042,23 +1057,23 @@ export default function RidePage() {
           <button
             onClick={planTrip}
             disabled={planning || !destQuery.trim()}
-            className="rounded-xl bg-indigo-600 px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
+            className="rounded-xl bg-[var(--sign-blue)] px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
           >
             {planning ? "…" : t("ride.plan")}
           </button>
         </div>
-        {planError && <p className="mt-2 text-sm text-red-600">{planError}</p>}
+        {planError && <p className="mt-2 text-sm text-[var(--sign-red)]">{planError}</p>}
         {planning && (
           <div className="mt-3 space-y-2">
-            <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
-            <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
+            <div className="h-16 animate-pulse rounded-xl bg-[var(--paper)]" />
+            <div className="h-16 animate-pulse rounded-xl bg-[var(--paper)]" />
           </div>
         )}
 
         {planOptions &&
           planOptions.length > 0 &&
           !planOptions.some((o) => o.hasMinibus) && (
-            <p className="mt-3 rounded-xl bg-amber-50 p-2.5 text-xs text-amber-900">
+            <p className="mt-3 rounded-xl bg-[var(--sign-amber-soft)] p-2.5 text-xs text-[var(--sign-amber)]">
               No green minibus on this trip — showing buses instead. Yau Lok
               still tracks them and shouts for you.
             </p>
@@ -1076,11 +1091,11 @@ export default function RidePage() {
               return (
                 <li
                   key={i}
-                  className="rounded-xl border border-slate-200 p-3 text-sm"
+                  className="rounded-xl border border-[var(--rule)] p-3 text-sm"
                 >
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="font-semibold">{opt.minutes} min</span>
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-ink-muted">
                       {opt.fare !== null && `HK$${opt.fare.toFixed(1)} · `}
                       {opt.km.toFixed(1)} km
                     </span>
@@ -1090,18 +1105,18 @@ export default function RidePage() {
                       <span key={j} className="flex items-center gap-1">
                         {j > 0 && <span className="text-slate-300">›</span>}
                         {l.kind === "walk" ? (
-                          <span className="text-slate-500">
+                          <span className="text-ink-muted">
                             🚶 {l.minutes}m
                           </span>
                         ) : (
                           <span
                             className={`rounded-full px-2 py-0.5 font-semibold ${
                               l.company === "gmb"
-                                ? "bg-emerald-100 text-emerald-900"
-                                : "bg-slate-100 text-slate-700"
+                                ? "bg-[var(--sign-green-soft)] text-[var(--sign-green)]"
+                                : "bg-[var(--paper)] text-ink-muted"
                             }`}
                           >
-                            {l.company === "gmb" ? "🚐" : "🚌"}{" "}
+                            <Bus className="size-3.5" aria-hidden />{" "}
                             {l.routeCode ?? "?"}
                             {l.numStops ? ` · ${l.numStops} stops` : ""}
                           </span>
@@ -1113,7 +1128,7 @@ export default function RidePage() {
                     <button
                       onClick={() => useLeg(target)}
                       disabled={routeLoading}
-                      className="mt-2 w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white transition active:scale-95 disabled:opacity-50"
+                      className="mt-2 w-full rounded-lg bg-ink py-2 text-sm font-medium text-white transition active:scale-95 disabled:opacity-50"
                     >
                       {routeLoading
                         ? "Loading…"
@@ -1128,16 +1143,14 @@ export default function RidePage() {
 
         <button
           onClick={() => setShowRouteCode((s) => !s)}
-          className="mt-3 text-xs font-medium text-indigo-600"
+          className="mt-3 text-xs font-medium text-[var(--sign-blue)]"
         >
           {showRouteCode ? "−" : "+"} {t("ride.knowCode")}
         </button>
         {showRouteCode && (
           <div className="mt-2 flex gap-2">
             <span className="field min-w-0 flex-1">
-              <span aria-hidden className="field-icon">
-                🚏
-              </span>
+              <span className="field-icon"><Signpost className="size-5" aria-hidden strokeWidth={2.2} /></span>
               <input
                 className="field-input"
                 placeholder="GMB route code, e.g. 4C"
@@ -1149,7 +1162,7 @@ export default function RidePage() {
             <button
               onClick={loadRoute}
               disabled={routeLoading || !routeCode.trim()}
-              className="rounded-xl bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
+              className="rounded-xl bg-ink px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
             >
               {routeLoading ? "…" : t("ride.load")}
             </button>
@@ -1157,46 +1170,46 @@ export default function RidePage() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <p className="text-xs uppercase tracking-wide text-slate-500">
+      <section className="card p-4">
+        <p className="text-xs uppercase tracking-wide text-ink-muted">
           {routeName}
         </p>
         {routeLoading && (
           <div className="mt-3 space-y-2">
-            <div className="h-9 animate-pulse rounded-lg bg-slate-100" />
-            <div className="h-9 animate-pulse rounded-lg bg-slate-100" />
+            <div className="h-9 animate-pulse rounded-lg bg-[var(--paper)]" />
+            <div className="h-9 animate-pulse rounded-lg bg-[var(--paper)]" />
           </div>
         )}
-        {routeError && <p className="mt-2 text-sm text-red-600">{routeError}</p>}
+        {routeError && <p className="mt-2 text-sm text-[var(--sign-red)]">{routeError}</p>}
 
         <SelectField
           label={t("ride.getOn")}
-          icon="📍"
+          icon={MapPin}
           accent="indigo"
           value={boardingSeq}
           onChange={(v) => setBoardingSeq(Number(v))}
           hint={
             eta && eta.etaMinutes.length > 0 ? (
-              <p className="mt-2 rounded-xl border border-emerald-100 bg-emerald-50 p-2.5 text-sm text-emerald-900">
-                🚐 {t("ride.nextMinibus")}:{" "}
+              <p className="mt-2 rounded-xl border border-[var(--sign-green)]/30 bg-[var(--sign-green-soft)] p-2.5 text-sm text-[var(--sign-green)]">
+                <Bus className="inline size-4 align-[-2px]" aria-hidden /> {t("ride.nextMinibus")}:{" "}
                 <span className="font-semibold">
                   {eta.etaMinutes
                     .slice(0, 3)
                     .map((m) => (m <= 0 ? "now" : `${m} min`))
                     .join(" · ")}
                 </span>
-                <span className="mt-0.5 block text-xs text-emerald-700">
+                <span className="mt-0.5 block text-xs text-[var(--sign-green)]">
                   {t("ride.etaLive")}
                 </span>
               </p>
             ) : routeLoaded ? (
-              <div className="mt-2 rounded-xl bg-slate-50 p-2.5 text-xs text-slate-500">
+              <div className="mt-2 rounded-xl bg-[var(--paper)] p-2.5 text-xs text-ink-muted">
                 {t("ride.noArrivals")}
                 {!serviceInfo && (
                   <button
                     onClick={checkService}
                     disabled={serviceLoading}
-                    className="ml-1 font-semibold text-indigo-600 underline disabled:opacity-50"
+                    className="ml-1 font-semibold text-[var(--sign-blue)] underline disabled:opacity-50"
                   >
                     {serviceLoading
                       ? t("ride.checking")
@@ -1204,11 +1217,11 @@ export default function RidePage() {
                   </button>
                 )}
                 {serviceInfo && (
-                  <span className="mt-1.5 block text-slate-700">
+                  <span className="mt-1.5 block text-ink-muted">
                     {serviceInfo.confident === false && "⚠️ "}
                     {serviceInfo.answer}
                     {serviceInfo.sources && serviceInfo.sources.length > 0 && (
-                      <span className="mt-0.5 block text-slate-400">
+                      <span className="mt-0.5 block text-ink-faint">
                         source:{" "}
                         {serviceInfo.sources.map((u, i) => (
                           <a
@@ -1224,7 +1237,7 @@ export default function RidePage() {
                         ))}
                       </span>
                     )}
-                    <span className="mt-0.5 block text-slate-400">
+                    <span className="mt-0.5 block text-ink-faint">
                       searched live via HKGAI Agenthub
                     </span>
                   </span>
@@ -1242,15 +1255,15 @@ export default function RidePage() {
 
         <SelectField
           label={t("ride.getOff")}
-          icon="🏁"
+          icon={Flag}
           accent="red"
           value={destinationSeq ?? ""}
           onChange={(v) => setDestinationSeq(Number(v))}
           hint={
             fare !== null ? (
-              <p className="mt-2 rounded-xl border border-amber-100 bg-amber-50 p-2.5 text-sm text-amber-900">
-                💰 {t("ride.fare")} <span className="font-semibold">HK${fare.toFixed(1)}</span>
-                <span className="mt-0.5 block text-xs text-amber-800">
+              <p className="mt-2 rounded-xl border border-amber-100 bg-[var(--sign-amber-soft)] p-2.5 text-sm text-[var(--sign-amber)]">
+                <Coins className="inline size-4 align-[-2px]" aria-hidden /> {t("ride.fare")} <span className="font-semibold">HK${fare.toFixed(1)}</span>
+                <span className="mt-0.5 block text-xs text-[var(--sign-amber)]">
                   {t("ride.fareHint")}
                 </span>
               </p>
@@ -1267,7 +1280,7 @@ export default function RidePage() {
         </SelectField>
 
         {!demoMode && gps.error && (
-          <p className="mt-2 text-sm text-red-600">GPS: {gps.error}</p>
+          <p className="mt-2 text-sm text-[var(--sign-red)]">GPS: {gps.error}</p>
         )}
       </section>
 
@@ -1281,7 +1294,7 @@ export default function RidePage() {
         accuracyM={null}
         waitingEtaLabel={
           eta && eta.etaMinutes.length > 0
-            ? `🚐 ${eta.etaMinutes[0] <= 0 ? "arriving now" : `${eta.etaMinutes[0]} min`}`
+            ? `${eta.etaMinutes[0] <= 0 ? "arriving now" : `${eta.etaMinutes[0]} min`}`
             : null
         }
       />
@@ -1290,11 +1303,11 @@ export default function RidePage() {
         <p
           className={`rounded-xl p-2.5 text-sm ${
             weather.wet
-              ? "border border-sky-200 bg-sky-50 text-sky-900"
-              : "bg-slate-100 text-slate-600"
+              ? "border border-[var(--sign-blue)]/30 bg-[var(--sign-blue-soft)] text-[var(--sign-blue)]"
+              : "bg-[var(--paper)] text-ink-muted"
           }`}
         >
-          {weather.wet ? "☔️" : "🌤"} {weather.text}
+          {weather.wet ? <Umbrella className="inline size-4 align-[-2px]" aria-hidden /> : <CloudSun className="inline size-4 align-[-2px]" aria-hidden />} {weather.text}
           {weather.temperature !== null && `, ${Math.round(weather.temperature)}°C`}
           {weather.station && ` at ${weather.station}`}
           {weather.wet && (
@@ -1306,7 +1319,7 @@ export default function RidePage() {
       )}
 
       {demoMode ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="rounded-xl border border-[var(--sign-amber)]/40 bg-[var(--sign-amber-soft)] p-3 text-sm text-[var(--sign-amber)]">
           <p className="font-semibold">{t("ride.demoBanner")}</p>
           <button
             onClick={() => {
@@ -1314,7 +1327,7 @@ export default function RidePage() {
               setBoarded(false);
               sim.reset();
             }}
-            className="mt-1.5 w-full rounded-lg bg-amber-900 py-2 font-semibold text-white transition active:scale-95"
+            className="mt-1.5 w-full rounded-lg bg-[var(--sign-amber)] py-2 font-semibold text-white transition active:scale-95"
           >
             {t("ride.switchLive")}
           </button>
@@ -1323,10 +1336,10 @@ export default function RidePage() {
         <div
           className={`rounded-xl p-3 text-sm ${
             gps.error
-              ? "border border-red-200 bg-red-50 text-red-800"
+              ? "border border-[var(--sign-red)]/30 bg-[var(--sign-red)]/8 text-[var(--sign-red-deep)]"
               : gps.position
-                ? "border border-emerald-200 bg-emerald-50 text-emerald-900"
-                : "border border-slate-200 bg-slate-50 text-slate-600"
+                ? "border border-[var(--sign-green)]/40 bg-[var(--sign-green-soft)] text-[var(--sign-green)]"
+                : "border border-[var(--rule)] bg-[var(--paper)] text-ink-muted"
           }`}
         >
           {gps.error
@@ -1340,9 +1353,9 @@ export default function RidePage() {
       <button
         onClick={() => setBoarded(true)}
         disabled={!demoMode && !gps.position}
-        className="rounded-2xl bg-indigo-600 p-5 text-center text-lg font-semibold text-white shadow-lg transition active:scale-95 disabled:opacity-50"
+        className="rounded-2xl bg-[var(--sign-blue)] p-5 text-center text-lg font-semibold text-white shadow-lg transition active:scale-95 disabled:opacity-50"
       >
-        🚐 {demoMode ? t("ride.startDemo") : t("ride.onBoard")}
+        <Bus className="inline size-5 align-[-3px]" aria-hidden /> {demoMode ? t("ride.startDemo") : t("ride.onBoard")}
         <span className="mt-0.5 block text-sm font-normal opacity-85">
           {t("ride.waitingAt")} {stops[boardingIdx]?.name.en}
         </span>
@@ -1357,13 +1370,14 @@ export default function RidePage() {
               onClick={() =>
                 setActiveTool((cur) => (cur === tool.id ? null : tool.id))
               }
-              className={`shrink-0 rounded-full px-3.5 py-2 text-sm font-medium transition active:scale-95 ${
+              className={`press flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border-2 px-3.5 text-sm font-bold ${
                 activeTool === tool.id
-                  ? "bg-slate-900 text-white"
-                  : "border border-slate-200 bg-white text-slate-700"
+                  ? "border-ink bg-ink text-white"
+                  : "border-[var(--rule)] bg-white text-ink-muted"
               }`}
             >
-              {tool.emoji} {t(tool.key)}
+              <tool.Icon className="size-4" aria-hidden strokeWidth={2.4} />
+              {t(tool.key)}
             </button>
           ))}
         </div>
@@ -1377,7 +1391,7 @@ export default function RidePage() {
           {activeTool === "say" && composer}
           {activeTool === "listen" && micPanel}
           {activeTool === "nearby" && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-3">
+            <section className="card p-3">
               <div className="flex gap-2">
                 {(["toilet", "market"] as const).map((t) => (
                   <button
@@ -1385,30 +1399,30 @@ export default function RidePage() {
                     onClick={() => loadFacilities(t)}
                     className={`flex-1 rounded-lg py-2 text-sm font-medium transition active:scale-95 ${
                       facilities && facilityType === t
-                        ? "bg-slate-900 text-white"
-                        : "border border-slate-200"
+                        ? "bg-ink text-white"
+                        : "border border-[var(--rule)]"
                     }`}
                   >
-                    {t === "toilet" ? "🚻 Public toilets" : "🧺 Markets"}
+                    <span className="flex items-center justify-center gap-1.5">{t === "toilet" ? <Toilet className="size-4" aria-hidden /> : <ShoppingBasket className="size-4" aria-hidden />}{t === "toilet" ? "Public toilets" : "Markets"}</span>
                   </button>
                 ))}
               </div>
               {facilitiesLoading && (
-                <div className="mt-2 h-12 animate-pulse rounded-lg bg-slate-100" />
+                <div className="mt-2 h-12 animate-pulse rounded-lg bg-[var(--paper)]" />
               )}
               {facilities && !facilitiesLoading && (
                 <ul className="mt-2 space-y-1 text-sm">
                   {facilities.length === 0 && (
-                    <li className="text-slate-500">None found nearby.</li>
+                    <li className="text-ink-muted">None found nearby.</li>
                   )}
                   {facilities.slice(0, 5).map((f, i) => (
                     <li
                       key={i}
-                      className="flex justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1.5"
+                      className="flex justify-between gap-2 rounded-lg bg-[var(--paper)] px-2 py-1.5"
                     >
                       <span className="min-w-0 truncate">{f.name}</span>
                       {f.distanceM !== null && (
-                        <span className="shrink-0 text-xs text-slate-500">
+                        <span className="shrink-0 text-xs text-ink-muted">
                           {f.distanceM} m
                         </span>
                       )}
@@ -1416,20 +1430,20 @@ export default function RidePage() {
                   ))}
                 </ul>
               )}
-              <p className="mt-1.5 text-xs text-slate-500">
+              <p className="mt-1.5 text-xs text-ink-muted">
                 Government facility data via HKGAI Toolhub.
               </p>
             </section>
           )}
           {activeTool === "voice" && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-3">
+            <section className="card p-3">
               <SelectField
                 label="Cantonese voice"
-                icon="🔊"
+                icon={Volume2}
                 value={personaKey}
                 onChange={pickPersona}
                 hint={
-                  <p className="mt-1.5 text-xs text-slate-500">
+                  <p className="mt-1.5 text-xs text-ink-muted">
                     Six HKGAI Cantonese voices — picking one plays a sample.
                   </p>
                 }
@@ -1445,10 +1459,10 @@ export default function RidePage() {
         </div>
       </section>
 
-      <p className="pb-4 text-center text-xs text-slate-400">
+      <p className="pb-4 text-center text-xs text-ink-faint">
         Alert fires {APPROACH_RADIUS_M} m before your stop · phrases spoken in
         colloquial Cantonese by HKGAI
       </p>
-    </main>
+    </Screen>
   );
 }

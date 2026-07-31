@@ -1,30 +1,98 @@
 @import "tailwindcss";
 
-/* Light theme only: the demo runs on unknown phones and a half-applied dark
-   palette (white cards on a black body) reads as broken. Lock it. */
+/* ---------------------------------------------------------------------------
+   膠牌 — the hand-lettered plastic destination signs in Hong Kong minibuses.
+   Thick red characters for where the bus goes, blue for the fare, on white
+   card stock. Here that vocabulary is semantic, not decorative:
+
+     red    = your destination, and the moment to shout
+     blue   = fare and factual information
+     ink    = everything you read
+     paper  = the surface it is printed on
+
+   Light only, on purpose: demo-day rendering has to be predictable, and a
+   half-checked dark palette is worse than none.
+--------------------------------------------------------------------------- */
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  /* Sign vocabulary */
+  --sign-red: #d7263d;
+  --sign-red-deep: #a81028;
+  --sign-blue: #12507e;
+  --sign-blue-soft: #e7f0f7;
+  --sign-green: #0f7a52; /* green minibus, and "on the way" */
+  --sign-green-soft: #e6f4ee;
+  --sign-amber: #b4690e;
+  --sign-amber-soft: #fdf1dd;
+
+  --ink: #14110f;
+  --ink-muted: #5d5751;
+  --ink-faint: #8d857e;
+  --paper: #fbf8f4; /* warm, like real sign stock — not clinical white */
+  --card: #ffffff;
+  --rule: #e4ddd4;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+
+  /* 4pt spacing rhythm and a single radius scale */
+  --r-sm: 0.5rem;
+  --r-md: 0.875rem;
+  --r-lg: 1.25rem;
+  --r-xl: 1.75rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-sign-red: var(--sign-red);
+  --color-sign-blue: var(--sign-blue);
+  --color-sign-green: var(--sign-green);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-rule: var(--rule);
+  --font-sans: var(--font-archivo);
+}
+
+/* Chinese renders in the platform's own HK face — PingFang HK on iOS, Noto
+   Sans CJK HK on Android. Correct HK glyph forms, and no multi-megabyte CJK
+   webfont on a prepaid data plan. */
+html {
+  font-family:
+    var(--font-archivo), -apple-system, BlinkMacSystemFont, "PingFang HK",
+    "Noto Sans CJK HK", "Noto Sans HK", "Microsoft JhengHei", sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
-  /* Stop iOS rubber-banding under the pinned action bar */
   overscroll-behavior-y: none;
 }
 
-/* ---- Form fields -------------------------------------------------------
-   Native <select> keeps the OS picker on mobile; we restyle the closed
-   state only: custom chevron, ellipsis for long stop names, focus ring. */
+/* Chinese set on a sign: heavy, tight, unmistakable. */
+.sign-zh {
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+}
+
+/* --- Surfaces ------------------------------------------------------------ */
+.card {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+}
+
+/* The destination plate: what a driver or a rider reads first. */
+.plate {
+  background: var(--card);
+  border: 3px solid var(--ink);
+  border-radius: var(--r-md);
+  box-shadow: 0 2px 0 0 var(--ink);
+}
+
+/* --- Form fields --------------------------------------------------------- */
 .field {
   position: relative;
   display: block;
@@ -32,13 +100,12 @@ body {
 
 .field-icon {
   position: absolute;
-  left: 0.75rem;
+  inset-inline-start: 0.85rem;
   top: 50%;
   translate: 0 -50%;
-  font-size: 1rem;
-  line-height: 1;
+  display: flex;
+  color: var(--ink-faint);
   pointer-events: none;
-  opacity: 0.75;
 }
 
 .field-select,
@@ -46,55 +113,41 @@ body {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  padding: 0.8rem 2.5rem 0.8rem 2.4rem;
-  font-size: 1rem; /* >=16px so iOS doesn't zoom on focus */
-  line-height: 1.3;
-  color: #0f172a;
-  background-color: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.85rem;
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  min-height: 3rem; /* 48px — above the 44pt minimum */
+  padding: 0.75rem 2.75rem 0.75rem 2.6rem;
+  font-size: 1rem; /* >=16px so iOS never zooms on focus */
+  line-height: 1.35;
+  color: var(--ink);
+  background-color: var(--card);
+  border: 1.5px solid var(--rule);
+  border-radius: var(--r-md);
   transition:
     border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    background-color 0.15s ease;
-  /* long HK stop names shouldn't slide under the chevron */
+    box-shadow 0.15s ease;
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
 }
 
-/* chevron */
 .field-select {
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%235d5751' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 0.85rem center;
+  background-position: right 0.9rem center;
   background-size: 1.15rem;
   cursor: pointer;
 }
-
-.field-select:hover,
-.field-input:hover {
-  border-color: #cbd5e1;
-  background-color: #fcfdff;
+[dir="rtl"] .field-select {
+  background-position: left 0.9rem center;
 }
 
 .field-select:focus-visible,
 .field-input:focus-visible {
   outline: none;
-  border-color: #4f46e5;
-  box-shadow:
-    0 0 0 3.5px rgba(79, 70, 229, 0.18),
-    0 1px 2px rgba(15, 23, 42, 0.05);
+  border-color: var(--sign-blue);
+  box-shadow: 0 0 0 3.5px rgba(18, 80, 126, 0.18);
 }
 
-.field-select:active {
-  scale: 0.995;
-}
-
-/* Destination marker breathes while the stop is approaching. */
+/* --- Motion -------------------------------------------------------------- */
 @keyframes stop-pulse {
   0%,
   100% {
@@ -110,14 +163,25 @@ body {
   animation: stop-pulse 1.2s ease-in-out infinite;
 }
 
-/* Glide the bus between GPS fixes instead of teleporting. */
 .bus-marker {
   transition: transform 1s linear;
 }
 
+/* The shout button is a physical thing: it sits on the page and depresses. */
+.press {
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.press:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .stop-pulse,
-  .bus-marker {
+  .bus-marker,
+  .press {
     animation: none;
     transition: none;
   }

@@ -92,5 +92,6 @@
   "ride.switchLive": "Switch to Live GPS for a real ride",
   "ride.startDemo": "Start the simulated ride",
   "ride.gpsReady": "GPS ready",
-  "ride.gpsSearching": "Searching for GPS… step near a window or outside."
+  "ride.gpsSearching": "Searching for GPS… step near a window or outside.",
+  "home.pickScenario": "Where are you going?"
 }

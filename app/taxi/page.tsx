@@ -9,6 +9,18 @@ import { useGeolocation, useWakeLock } from "@/hooks/useGeolocation";
 import { cumulativeMeters, projectOntoPath, type LatLng } from "@/lib/geo";
 import { friendlyMicError, listenUserSpeech, speakCantonese } from "@/lib/speech";
 import RideMap from "@/components/RideMap";
+import { Screen, TopBar, Card, SectionLabel, StatusBanner } from "@/components/ui";
+import {
+  PersonStanding,
+  Target,
+  Pencil,
+  Mic,
+  Volume2,
+  Car,
+  Navigation,
+  MapPin,
+} from "lucide-react";
+import { useT } from "@/lib/i18n";
 
 type Plan = {
   distanceM: number;
@@ -34,6 +46,7 @@ const GROUPS: { id: TaxiPhrase["group"]; label: string }[] = [
 ];
 
 export default function TaxiPage() {
+  const t = useT();
   const [personaKey, setPersonaKey] = useState(DEFAULT_PERSONA_KEY);
   const [langCode, setLangCode] = useState(DEFAULT_LANGUAGE_CODE);
   const [coach, setCoach] = useState(true);
@@ -187,29 +200,27 @@ export default function TaxiPage() {
   }, [routePath, plan]);
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full min-w-0 max-w-md flex-col gap-4 overflow-x-hidden p-4">
-      <header className="flex items-center justify-between">
-        <Link href="/" className="text-sm font-medium text-slate-500">
-          ← Yau Lok!
-        </Link>
+    <Screen>
+      <TopBar>
         <button
           onClick={() => setCoach((c) => !c)}
-          className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-            coach ? "bg-teal-600 text-white" : "bg-slate-200 text-slate-700"
+          aria-pressed={coach}
+          className={`min-h-11 rounded-full border-2 border-ink px-3 text-xs font-bold uppercase tracking-wide ${
+            coach ? "bg-ink text-white" : "bg-white text-ink-muted"
           }`}
         >
-          Coach
+          {t("common.coach")}
         </button>
-      </header>
+      </TopBar>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <p className="text-sm font-semibold">🚕 Where to?</p>
-        <p className="mt-0.5 text-xs text-slate-500">
+      <section className="card p-4">
+        <p className="text-base font-extrabold">{t("taxi.whereTo")}</p>
+        <p className="mt-0.5 text-xs text-ink-muted">
           We&apos;ll show the driver the address in Chinese, estimate the fare,
           and watch the route while you ride.
         </p>
         <span className="field mt-2 block">
-          <span aria-hidden className="field-icon">🧍</span>
+          <span className="field-icon"><PersonStanding className="size-5" aria-hidden strokeWidth={2.2} /></span>
           <input
             className="field-input"
             placeholder="From (e.g. Shek Pai Wan Estate)"
@@ -223,20 +234,20 @@ export default function TaxiPage() {
             setWantLocation(true);
             setOriginQuery("");
           }}
-          className="mt-1 text-xs font-medium text-indigo-600"
+          className="mt-1 text-xs font-medium text-[var(--sign-blue)]"
         >
           {gps.position
-            ? `📍 using my location (±${Math.round(gps.accuracy ?? 0)} m)`
+            ? `using my location (±${Math.round(gps.accuracy ?? 0)} m)`
             : wantLocation
               ? "locating…"
-              : "📍 or start from my location"}
+              : "or start from my location"}
         </button>
         {wantLocation && gps.error && (
-          <p className="mt-1 text-xs text-red-600">{gps.error}</p>
+          <p className="mt-1 text-xs text-[var(--sign-red)]">{gps.error}</p>
         )}
         <div className="mt-2 flex gap-2">
           <span className="field min-w-0 flex-1">
-            <span aria-hidden className="field-icon">🎯</span>
+            <span className="field-icon"><Target className="size-5" aria-hidden strokeWidth={2.2} /></span>
             <input
               className="field-input"
               placeholder="To (e.g. Times Square)"
@@ -248,30 +259,30 @@ export default function TaxiPage() {
           <button
             onClick={planTrip}
             disabled={planning || !destQuery.trim()}
-            className="rounded-xl bg-indigo-600 px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
+            className="rounded-xl bg-[var(--sign-blue)] px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
           >
             {planning ? "…" : "Plan"}
           </button>
         </div>
-        {planError && <p className="mt-2 text-sm text-red-600">{planError}</p>}
+        {planError && <p className="mt-2 text-sm text-[var(--sign-red)]">{planError}</p>}
       </section>
 
       {plan && (
         <>
           {/* The single most useful thing: something the driver can read */}
-          <section className="rounded-2xl border-2 border-slate-900 bg-white p-4 text-center">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <section className="plate p-5 text-center">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
               Show this to the driver
             </p>
-            <p className="mt-1 text-3xl font-bold leading-snug">
+            <p className="sign-zh mt-1 text-[2.5rem] text-[var(--sign-red)]" lang="zh-HK">
               {plan.destinationChinese ?? plan.destinationInput}
             </p>
             {plan.destinationAddress && (
-              <p className="mt-1 text-lg font-medium text-slate-700">
+              <p className="sign-zh mt-2 text-xl text-[var(--sign-blue)]" lang="zh-HK">
                 {plan.destinationAddress}
               </p>
             )}
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-ink-muted">
               {plan.destinationInput}
             </p>
             <button
@@ -281,23 +292,23 @@ export default function TaxiPage() {
                   personaKey,
                 )
               }
-              className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-semibold text-white transition active:scale-95"
+              className="mt-3 w-full rounded-xl bg-ink py-3 font-semibold text-white transition active:scale-95"
             >
-              🔊 Say it in Cantonese
+              <span className="flex items-center justify-center gap-2"><Volume2 className="size-5" aria-hidden />{t("taxi.sayCantonese")}</span>
             </button>
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-4">
+          <section className="card p-4">
             <div className="flex items-baseline justify-between">
               <span className="text-sm font-semibold">
                 About HK${plan.fare.low}–{plan.fare.high}
               </span>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-ink-muted">
                 {(plan.distanceM / 1000).toFixed(1)} km ·{" "}
                 {Math.round(plan.durationS / 60)} min
               </span>
             </div>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-ink-muted">
               Estimate from the urban (red) taxi scale for this distance, with
               an allowance for traffic. <strong>Excludes</strong> tunnel tolls,
               luggage and pet surcharges, so the meter can legitimately read
@@ -318,9 +329,9 @@ export default function TaxiPage() {
           {!riding ? (
             <button
               onClick={() => setRiding(true)}
-              className="rounded-2xl bg-indigo-600 p-5 text-center text-lg font-semibold text-white shadow-lg transition active:scale-95"
+              className="rounded-2xl bg-[var(--sign-blue)] p-5 text-center text-lg font-semibold text-white shadow-lg transition active:scale-95"
             >
-              🚕 I&apos;m in the taxi — watch the route
+              <span className="flex items-center justify-center gap-2"><Car className="size-5" aria-hidden />{t("taxi.inTaxi")}</span>
               <span className="mt-0.5 block text-sm font-normal opacity-85">
                 uses GPS, keeps the screen awake
               </span>
@@ -329,8 +340,8 @@ export default function TaxiPage() {
             <section
               className={`rounded-2xl p-4 text-center ${
                 offRoute
-                  ? "bg-amber-100 text-amber-950"
-                  : "bg-emerald-100 text-emerald-900"
+                  ? "bg-[var(--sign-amber-soft)] text-[var(--sign-amber)]"
+                  : "bg-[var(--sign-green-soft)] text-[var(--sign-green)]"
               }`}
             >
               <p className="text-lg font-semibold">
@@ -350,7 +361,7 @@ export default function TaxiPage() {
                   }
                   className="mt-2 w-full rounded-xl bg-white/80 py-2.5 font-semibold"
                 >
-                  🔊 「請問行邊條路？」 Which way are we going?
+                  <span className="flex items-center justify-center gap-2"><Volume2 className="size-4" aria-hidden />「請問行邊條路？」</span>
                 </button>
               )}
               <button
@@ -367,14 +378,14 @@ export default function TaxiPage() {
         </>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <section className="card p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
           Say anything · AI
         </p>
         <label className="mt-2 block">
-          <span className="mb-1 block text-xs font-medium text-slate-600">I speak</span>
+          <span className="mb-1 block text-xs font-medium text-ink-muted">I speak</span>
           <span className="field">
-            <span aria-hidden className="field-icon">🌏</span>
+            <span className="field-icon"><Volume2 className="size-5" aria-hidden strokeWidth={2.2} /></span>
             <select
               className="field-select"
               value={langCode}
@@ -393,14 +404,14 @@ export default function TaxiPage() {
           onClick={sayByVoice}
           disabled={sayListening || sayLoading}
           className={`mt-2 w-full rounded-xl p-3.5 text-center font-semibold text-white transition active:scale-95 disabled:opacity-70 ${
-            sayListening ? "animate-pulse bg-red-600" : "bg-indigo-600"
+            sayListening ? "animate-pulse bg-[var(--sign-red)]" : "bg-[var(--sign-blue)]"
           }`}
         >
-          {sayListening ? "🔴 Listening… speak now" : sayLoading ? "Translating…" : "🎙️ Say it in your language"}
+          {sayListening ? t("say.listening") : sayLoading ? "Translating…" : t("say.speak")}
         </button>
         <div className="mt-2 flex gap-2">
           <span className="field min-w-0 flex-1">
-            <span aria-hidden className="field-icon">✍️</span>
+            <span className="field-icon"><Pencil className="size-5" aria-hidden strokeWidth={2.2} /></span>
             <input
               className="field-input"
               placeholder="…or type it — any language"
@@ -412,16 +423,16 @@ export default function TaxiPage() {
           <button
             onClick={() => runSay(sayText)}
             disabled={sayLoading || sayListening || !sayText.trim()}
-            className="rounded-xl bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
+            className="rounded-xl bg-ink px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
           >
             {sayLoading ? "…" : "Say it"}
           </button>
         </div>
-        {sayError && <p className="mt-2 text-sm text-red-600">{sayError}</p>}
+        {sayError && <p className="mt-2 text-sm text-[var(--sign-red)]">{sayError}</p>}
         {sayResult && (
           <button
             onClick={() => speakCantonese(sayResult.cantonese, personaKey)}
-            className="mt-2 w-full rounded-xl bg-slate-900 p-3 text-center text-white transition active:scale-95"
+            className="mt-2 w-full rounded-xl bg-ink p-3 text-center text-white transition active:scale-95"
           >
             <span className="block text-2xl font-bold">{sayResult.cantonese}</span>
             {coach && (
@@ -436,7 +447,7 @@ export default function TaxiPage() {
 
       {GROUPS.map((g) => (
         <section key={g.id}>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-muted">
             {g.label}
           </p>
           <div className="space-y-2">
@@ -444,41 +455,41 @@ export default function TaxiPage() {
               <button
                 key={p.id}
                 onClick={() => speak(p)}
-                className={`w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition active:scale-95 ${
-                  speaking === p.id ? "ring-2 ring-amber-400" : ""
+                className={`w-full card p-3 text-left transition active:scale-95 ${
+                  speaking === p.id ? "ring-2 ring-[var(--sign-amber)]" : ""
                 }`}
               >
                 <span className="block text-base font-semibold">{p.cantonese}</span>
                 {coach && (
-                  <span className="block text-xs text-slate-500">{p.jyutping}</span>
+                  <span className="block text-xs text-ink-muted">{p.jyutping}</span>
                 )}
-                <span className="block text-xs text-slate-500">{p.english}</span>
+                <span className="block text-xs text-ink-muted">{p.english}</span>
               </button>
             ))}
           </div>
         </section>
       ))}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <p className="text-sm font-semibold">Know where you stand</p>
         <ul className="mt-2 space-y-2.5">
           {TAXI_TIPS.map((t) => (
             <li key={t.title}>
               <p className="text-sm font-medium">{t.title}</p>
-              <p className="text-xs leading-relaxed text-slate-500">{t.body}</p>
+              <p className="text-xs leading-relaxed text-ink-muted">{t.body}</p>
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-xs text-slate-400">
+        <p className="mt-3 text-xs text-ink-faint">
           General information based on Transport Department guidance — not
           legal advice. Check td.gov.hk for the current rules and complaint
           channels.
         </p>
       </section>
 
-      <p className="pb-4 text-center text-xs text-slate-400">
+      <p className="pb-4 text-center text-xs text-ink-faint">
         Routes and addresses via HKGAI Toolhub · Cantonese spoken by HKGAI
       </p>
-    </main>
+    </Screen>
   );
 }

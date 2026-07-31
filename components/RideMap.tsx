@@ -104,11 +104,23 @@ export default function RideMap({
     return () => ro.disconnect();
   }, [ready]);
 
-  // Switching between the waiting and riding layouts changes the map's box;
-  // re-measure so Leaflet requests tiles for the size it actually has.
+  // Switching between the waiting and riding layouts changes the map's box.
+  // One immediate measure isn't enough: the flex column is still settling, so
+  // Leaflet would request tiles for a stale width and leave the rest grey.
+  // Measure now, next frame, and once more after the transition lands.
   useEffect(() => {
     if (!ready) return;
-    mapRef.current?.invalidateSize();
+    const map = mapRef.current;
+    if (!map) return;
+    map.invalidateSize();
+    const raf = requestAnimationFrame(() => map.invalidateSize());
+    const t1 = setTimeout(() => map.invalidateSize(), 150);
+    const t2 = setTimeout(() => map.invalidateSize(), 500);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, [ready, tall]);
 
   // (Re)draw route line + stops when the route or picks change.
@@ -121,7 +133,7 @@ export default function RideMap({
 
     const line: [number, number][] =
       path.length >= 2 ? path : stops.map((s) => [s.lat, s.lng]);
-    const poly = L.polyline(line, { color: "#0f766e", weight: 4, opacity: 0.8 });
+    const poly = L.polyline(line, { color: "#12507e", weight: 5, opacity: 0.85 });
     poly.addTo(map);
     routeLayerRef.current.push(poly);
 
@@ -130,8 +142,8 @@ export default function RideMap({
       const isDest = s.seq === destinationSeq;
       const marker = L.circleMarker([s.lat, s.lng], {
         radius: isBoard || isDest ? 8 : 4,
-        color: isBoard ? "#4f46e5" : isDest ? "#dc2626" : "#0f766e",
-        fillColor: isBoard ? "#818cf8" : isDest ? "#f87171" : "#ffffff",
+        color: isBoard ? "#12507e" : isDest ? "#d7263d" : "#12507e",
+        fillColor: isBoard ? "#12507e" : isDest ? "#d7263d" : "#ffffff",
         fillOpacity: 1,
         weight: 2,
         className: isDest && urgent ? "stop-pulse" : undefined,
@@ -176,9 +188,9 @@ export default function RideMap({
       if (!accuracyRef.current) {
         accuracyRef.current = L.circle([position.lat, position.lng], {
           radius: accuracyM,
-          color: "#4f46e5",
+          color: "#12507e",
           weight: 1,
-          fillColor: "#818cf8",
+          fillColor: "#12507e",
           fillOpacity: 0.15,
         }).addTo(map);
       } else {
@@ -193,9 +205,15 @@ export default function RideMap({
       busRef.current = L.marker([position.lat, position.lng], {
         icon: L.divIcon({
           className: "bus-marker",
-          html: '<div style="font-size:26px;line-height:26px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.45))">🚐</div>',
-          iconSize: [26, 26],
-          iconAnchor: [13, 13],
+          html:
+            '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" ' +
+            'style="filter:drop-shadow(0 1px 3px rgba(0,0,0,.45))">' +
+            '<rect x="1" y="1" width="22" height="22" rx="7" fill="#d7263d" stroke="#fff" stroke-width="2"/>' +
+            '<path d="M7 8.5h10v5.5H7z" fill="#fff"/>' +
+            '<circle cx="9" cy="16" r="1.5" fill="#fff"/><circle cx="15" cy="16" r="1.5" fill="#fff"/>' +
+            '</svg>',
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
         }),
         zIndexOffset: 1000,
       }).addTo(map);
@@ -221,7 +239,7 @@ export default function RideMap({
   // tile positioning — the route line still draws, but the map goes white.
   return (
     <div
-      className={`w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 ${
+      className={`w-full overflow-hidden rounded-2xl border-2 border-ink bg-[var(--rule)] ${
         tall ? "h-full min-h-40 flex-1" : "h-52"
       }`}
     >

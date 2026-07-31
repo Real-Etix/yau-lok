@@ -1,6 +1,7 @@
 "use client";
 
 import { USER_LANGUAGES } from "@/data/languages";
+import { Globe } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 
 /**
@@ -12,12 +13,12 @@ export default function LanguagePicker({ hint }: { hint?: boolean }) {
   const { lang, setLang, t } = useLanguage();
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-slate-600">
+      <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-ink-muted">
         {t("app.language")}
       </span>
       <span className="field">
-        <span aria-hidden className="field-icon">
-          🌏
+        <span className="field-icon">
+          <Globe className="size-5" aria-hidden strokeWidth={2.2} />
         </span>
         <select
           className="field-select"
@@ -32,7 +33,7 @@ export default function LanguagePicker({ hint }: { hint?: boolean }) {
         </select>
       </span>
       {hint && (
-        <span className="mt-1 block text-xs text-slate-500">
+        <span className="mt-1 block text-xs text-ink-faint">
           {t("app.languageHint")}
         </span>
       )}
