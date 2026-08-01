@@ -1,18 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#dc2626"/>
-  <!-- minibus body -->
-  <rect x="96" y="168" width="288" height="176" rx="34" fill="#ffffff"/>
-  <!-- windscreen + windows -->
-  <rect x="128" y="200" width="84" height="66" rx="16" fill="#dc2626"/>
-  <rect x="232" y="200" width="60" height="66" rx="14" fill="#dc2626"/>
-  <rect x="312" y="200" width="40" height="66" rx="14" fill="#dc2626"/>
-  <!-- wheels -->
-  <circle cx="164" cy="352" r="34" fill="#ffffff"/>
-  <circle cx="164" cy="352" r="14" fill="#dc2626"/>
-  <circle cx="316" cy="352" r="34" fill="#ffffff"/>
-  <circle cx="316" cy="352" r="14" fill="#dc2626"/>
-  <!-- motion lines (the shout / the go) -->
-  <rect x="396" y="196" width="72" height="26" rx="13" fill="#ffffff" opacity="0.95"/>
-  <rect x="404" y="242" width="64" height="26" rx="13" fill="#ffffff" opacity="0.75"/>
-  <rect x="412" y="288" width="56" height="26" rx="13" fill="#ffffff" opacity="0.55"/>
+  <!-- §8: the framed LED board from screen 01 — brand cabinet, ink frame,
+       amber dot-matrix 有落 on black. -->
+  <rect width="512" height="512" rx="112" fill="#0f7a52"/>
+  <rect x="52" y="108" width="408" height="296" rx="38" fill="#14110f"/>
+  <rect x="70" y="126" width="372" height="260" rx="26" fill="#0a0a0a"/>
+  <text x="256" y="238" text-anchor="middle" dominant-baseline="middle"
+        font-family="DotGothic16, 'PingFang HK', 'Noto Sans HK', 'Hiragino Sans', sans-serif"
+        font-size="132" fill="#ffb020">有落</text>
+  <text x="256" y="330" text-anchor="middle" dominant-baseline="middle"
+        font-family="DotGothic16, 'Courier New', monospace"
+        font-size="34" letter-spacing="7" fill="#ff8a00">YAU LOK!</text>
+  <!-- scanlines: the same 4px rhythm as .led-dots -->
+  <g fill="#0a0a0a" opacity="0.3">
+    <rect x="70" y="126" width="372" height="260" rx="26"
+          fill="url(#scan)"/>
+  </g>
+  <defs>
+    <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="2" fill="#000" opacity="0.45"/>
+    </pattern>
+  </defs>
 </svg>

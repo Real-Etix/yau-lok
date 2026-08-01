@@ -28,7 +28,7 @@ export const TAXI_PHRASES: TaxiPhrase[] = [
     cantonese: "請問行邊條隧道？",
     jyutping: "cing2 man6 haang4 bin1 tiu4 seoi6 dou6?",
     english: "Which tunnel are we taking?",
-    group: "during",
+    group: "boarding",
   },
   {
     id: "slow-down",
@@ -71,26 +71,22 @@ export const TAXI_PHRASES: TaxiPhrase[] = [
  * Passenger rights and practical notes. General information gathered from
  * Transport Department guidance — not legal advice, and worth confirming on
  * td.gov.hk before relying on it in a dispute.
+ *
+ * Only ids live here: the wording is Chinese on the design and has to be
+ * translatable, so title and body come from the catalogue as
+ * `taxi.tip.<id>.title` / `.body`.
  */
-export const TAXI_TIPS: { title: string; body: string }[] = [
-  {
-    title: "A driver should not refuse you because of where you're going",
-    body: "A taxi showing itself as available for hire is expected to take you. Refusing a hire is an offence — note the licence number and report it rather than arguing at the kerb.",
-  },
-  {
-    title: "The meter should be running",
-    body: "Fares are set by an official scale, not negotiated. If the meter isn't switched on, ask for it politely — 「唔該，用咪錶」 — before the journey starts.",
-  },
-  {
-    title: "You can ask for a receipt",
-    body: "A receipt shows the fare and the taxi's details, which is what makes a later complaint possible. Ask before you pay.",
-  },
-  {
-    title: "Tolls and extras are on top of the meter",
-    body: "Tunnel tolls, luggage, and pets carry defined surcharges, so the amount due can exceed the meter legitimately. Our estimate excludes them.",
-  },
-  {
-    title: "Note the taxi's details before you complain",
-    body: "The licence plate and driver's licence number are displayed inside. With those and a receipt, complaints go to the Transport Department; call 999 only if you feel unsafe.",
-  },
+export type TaxiTip = { id: string };
+
+export const TAXI_TIPS: TaxiTip[] = [
+  { id: "detour-normal" },
+  { id: "meter-on" },
+  { id: "receipt-right" },
+  { id: "extras-on-top" },
+  { id: "refusal" },
+  { id: "note-details" },
 ];
+
+/** The two shown while off-route, and the three shown when paying. */
+export const DETOUR_TIPS = ["detour-normal", "meter-on"] as const;
+export const PAYING_TIPS = ["receipt-right", "extras-on-top", "refusal"] as const;

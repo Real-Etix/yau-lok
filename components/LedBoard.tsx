@@ -25,6 +25,16 @@ type Props = {
   framed?: boolean;
   /** Marquee the primary line — only when it actually overflows */
   scroll?: boolean;
+  /**
+   * Logo laid out across instead of stacked: mark on the left, wordmark and
+   * tagline beside it, status lamp at the right. The home board reads as a
+   * strip of destination glass rather than a centred badge.
+   */
+  horizontal?: boolean;
+  /** Second dim line beside the wordmark (horizontal logo only) */
+  tagline?: string;
+  /** Green pulsing lamp + label at the right (horizontal logo only) */
+  lamp?: string;
   className?: string;
 };
 
@@ -50,6 +60,9 @@ export default function LedBoard({
   trailing,
   framed,
   scroll,
+  horizontal,
+  tagline,
+  lamp,
   className = "",
 }: Props) {
   // Only marquee when the text genuinely overflows its plate — a scrolling
@@ -71,6 +84,58 @@ export default function LedBoard({
   }, [scroll, primary]);
 
   const glow = size === "logo" || size === "header" || size === "display";
+
+  if (horizontal) {
+    return (
+      <div
+        className={`led led-dots relative rounded-[11px] px-[15px] pb-2.5 pt-3 ${
+          framed ? "led-framed" : ""
+        } ${className}`}
+      >
+        <div className="flex items-center gap-3">
+          <span
+            className="led-glow shrink-0 text-[40px] leading-none"
+            style={{ color: "var(--led-on)" }}
+          >
+            {primary}
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-[5px]">
+            {secondary && (
+              <span
+                className="text-[12px] leading-none tracking-[0.22em]"
+                style={{ color: "var(--led-dim)" }}
+              >
+                {secondary}
+              </span>
+            )}
+            {tagline && (
+              <span
+                className="text-[12px] leading-[1.3]"
+                style={{ color: "var(--led-on)" }}
+              >
+                {tagline}
+              </span>
+            )}
+          </span>
+          {lamp && (
+            <span className="flex shrink-0 items-center gap-1.5">
+              <span
+                aria-hidden
+                className="soft-pulse size-[7px] rounded-full"
+                style={{ background: "#4ade80" }}
+              />
+              <span
+                className="text-[10px] leading-none tracking-[0.1em]"
+                style={{ color: "#4ade80" }}
+              >
+                {lamp}
+              </span>
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

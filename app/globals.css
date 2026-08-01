@@ -45,6 +45,29 @@
   --sign-amber: #b4690e;
   --sign-amber-soft: #fdf1dd;
 
+  /* ---- Scenario liveries ----------------------------------------------
+     Each scenario wears its own vehicle or room, so a rider knows which
+     world they are in before reading a word. Red is the taxi and 999; blue
+     is medical chrome; amber/yellow is always a *sign*, never type; and the
+     seven-seg red below appears only inside a meter bezel. */
+
+  /* 的士 — the 咪錶, red seven-seg on black */
+  --meter-bg: #0a0a0a;
+  --meter-on: #ff2e2e;
+  --meter-btn: #1b2430; /* the 空/往/停/附加 button rail */
+  --taxi-cabin: #eae6e0; /* body panel: the back of the cab */
+
+  /* 急症室 — HKFSD lemon ambulance body with a battenburg stripe */
+  --amb-yellow: #f5de00;
+  --amb-blue: var(--sign-blue); /* type + primary action */
+  --amb-blue-deep: #0b3654; /* pressed shadow */
+  --ward-grey: #f1efe9; /* body panel: the waiting hall */
+
+  /* 茶餐廳 — mosaic tile wall and melamine crockery */
+  --tile-cream: #f3ebdb; /* body panel: the tiled wall */
+  --melamine: #f5d547; /* yellow plate / table-number chip */
+  --melamine-mint: #bfe3d0; /* mint plate, secondary chip */
+
   --ink: #14110f;
   --ink-muted: #5d5751;
   --ink-faint: #8d857e;
@@ -77,6 +100,17 @@
   --color-led-on: var(--led-on);
   --color-led-dim: var(--led-dim);
   --color-body-cream: var(--body-cream);
+  --color-meter-bg: var(--meter-bg);
+  --color-meter-on: var(--meter-on);
+  --color-meter-btn: var(--meter-btn);
+  --color-taxi-cabin: var(--taxi-cabin);
+  --color-amb-yellow: var(--amb-yellow);
+  --color-amb-blue: var(--amb-blue);
+  --color-amb-blue-deep: var(--amb-blue-deep);
+  --color-ward-grey: var(--ward-grey);
+  --color-tile-cream: var(--tile-cream);
+  --color-melamine: var(--melamine);
+  --color-melamine-mint: var(--melamine-mint);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
   --color-ink-faint: var(--ink-faint);
@@ -275,12 +309,42 @@ body {
   animation: shout-breathe 1.6s ease-in-out infinite;
 }
 
+/* Livery motion: the GPS lamp on the taxi header, the ring around the cab on
+   the map, and the meter's glow while hired. All three stop on request. */
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes map-ring {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+.soft-pulse {
+  animation: soft-pulse 1.6s infinite;
+}
+.map-ring {
+  animation: map-ring 1.8s infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .stop-pulse,
   .bus-marker,
   .press,
   .led-marquee,
-  .shout-breathe {
+  .shout-breathe,
+  .soft-pulse,
+  .map-ring,
+  .meter-hired {
     animation: none;
     transition: none;
   }

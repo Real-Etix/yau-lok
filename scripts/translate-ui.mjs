@@ -4,6 +4,7 @@
 //
 //   node scripts/translate-ui.mjs            # every language
 //   node scripts/translate-ui.mjs cmn id     # only these
+//   node scripts/translate-ui.mjs --missing  # only keys not yet translated
 //
 // Chinese text inside a string (有落, 唔該晒) must survive untouched: those
 // are the phrases the user shows or shouts, not UI chrome.
@@ -52,7 +53,12 @@ const LANGUAGES = [
 ];
 
 const source = JSON.parse(readFileSync(join(root, "data/i18n/en.json"), "utf8"));
-const only = process.argv.slice(2);
+const args = process.argv.slice(2);
+// --missing translates only keys a dictionary does not have yet, and merges.
+// Full runs overwrite hand-corrected strings, so this is the safe default
+// once a language has shipped.
+const missingOnly = args.includes("--missing");
+const only = args.filter((a) => !a.startsWith("--"));
 const targets = only.length ? LANGUAGES.filter(([c]) => only.includes(c)) : LANGUAGES;
 
 const SYSTEM = (language) => `You localise a mobile app used in Hong Kong by people who do not speak Cantonese.
@@ -82,11 +88,24 @@ async function translateChunk(chunk, language) {
   return JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
 }
 
-const entries = Object.entries(source);
 const CHUNK = 20; // smaller chunks = fewer malformed-JSON retries
 
 for (const [code, language] of targets) {
-  const out = {};
+  const path = join(root, `data/i18n/${code}.json`);
+  let existing = {};
+  if (missingOnly) {
+    try {
+      existing = JSON.parse(readFileSync(path, "utf8"));
+    } catch {
+      /* first run for this language */
+    }
+  }
+  const entries = Object.entries(source).filter(([k]) => !(k in existing));
+  if (entries.length === 0) {
+    console.log(` ${code}: already complete`);
+    continue;
+  }
+  const out = { ...existing };
   let failed = 0;
   for (let i = 0; i < entries.length; i += CHUNK) {
     const chunk = Object.fromEntries(entries.slice(i, i + CHUNK));
@@ -101,6 +120,8 @@ for (const [code, language] of targets) {
   }
   // Any key the model dropped falls back to English rather than disappearing.
   for (const k of Object.keys(source)) if (!(k in out)) out[k] = source[k];
-  writeFileSync(join(root, `data/i18n/${code}.json`), JSON.stringify(out, null, 2) + "\n");
-  console.log(` ${code}: ${Object.keys(out).length} keys${failed ? `, ${failed} chunk(s) fell back to English` : ""}`);
+  writeFileSync(path, JSON.stringify(out, null, 2) + "\n");
+  console.log(
+    ` ${code}: ${Object.keys(out).length} keys (${entries.length} new)${failed ? `, ${failed} chunk(s) fell back to English` : ""}`,
+  );
 }

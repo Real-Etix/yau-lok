@@ -11,7 +11,14 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
 } from "react";
+import {
+  loadSimplified,
+  simplify,
+  simplifiedReady,
+  subscribeSimplified,
+} from "@/lib/simplified";
 import { DEFAULT_LANGUAGE_CODE, getLanguage } from "@/data/languages";
 import en from "@/data/i18n/en.json";
 import zhHant from "@/data/i18n/zhHant.json";
@@ -81,4 +88,69 @@ export function useLanguage() {
 /** Shorthand for components that only need the translator. */
 export function useT() {
   return useContext(LanguageContext).t;
+}
+
+/**
+ * Stop names are bilingual in the source data, and which half leads depends on
+ * who is reading. A Chinese reader wants 石排灣邨公共運輸交匯處 first; everyone
+ * else wants the English first — but never *only* English, because the sign at
+ * the kerb and the driver both speak Chinese.
+ */
+export function useStopName() {
+  const { lang } = useContext(LanguageContext);
+  const chineseFirst = lang === "zhHant" || lang === "cmn";
+  const sc = useSimplify();
+  return useCallback(
+    (stop?: { name: { tc: string; en: string } } | null) => {
+      if (!stop) return { primary: "", secondary: "" };
+      const tc = sc(stop.name.tc);
+      const enName = stop.name.en;
+      const primary = (chineseFirst ? tc : enName) || tc || enName || "";
+      const secondaryRaw = chineseFirst ? enName : tc;
+      // Don't repeat yourself when only one name exists.
+      const secondary = secondaryRaw && secondaryRaw !== primary ? secondaryRaw : "";
+      return { primary, secondary };
+    },
+    [chineseFirst, sc],
+  );
+}
+
+/**
+ * Converts Traditional Chinese coming from Hong Kong open data into Simplified
+ * for readers who chose 简体中文. Every other language gets the string back
+ * untouched, and never downloads the conversion table.
+ */
+export function useSimplify() {
+  const { lang } = useContext(LanguageContext);
+  const needed = lang === "cmn";
+  const ready = useSyncExternalStore(
+    subscribeSimplified,
+    simplifiedReady,
+    () => false,
+  );
+  useEffect(() => {
+    if (needed) loadSimplified();
+  }, [needed]);
+  return useCallback(
+    (text: string) => (needed && ready && text ? simplify(text) : text),
+    [needed, ready],
+  );
+}
+
+/**
+ * Picks the reader's side of any bilingual `{ en, tc }` the Hong Kong feeds
+ * return — hospital names, districts, waiting-time bands. Mandarin readers
+ * get the Traditional text converted, exactly as stop names are.
+ */
+export function useBilingual() {
+  const { lang } = useContext(LanguageContext);
+  const chinese = lang === "zhHant" || lang === "cmn";
+  const sc = useSimplify();
+  return useCallback(
+    (pair?: { en: string; tc: string } | null) => {
+      if (!pair) return "";
+      return chinese ? sc(pair.tc) || pair.en : pair.en || pair.tc;
+    },
+    [chinese, sc],
+  );
 }

@@ -47,6 +47,8 @@ export function useRideTracker(
   position: LatLng | null,
   /** Road polyline the bus drives; enables along-route measurement */
   path: LatLng[] = [],
+  /** How early to warn, in metres — the user's §5/08 alert-distance setting */
+  approachRadiusM: number = APPROACH_RADIUS_M,
 ): RideStatus {
   const cum = useMemo(() => cumulativeMeters(path), [path]);
 
@@ -135,7 +137,10 @@ export function useRideTracker(
 
     let state: RideState = "riding";
     if (distanceM <= ARRIVE_RADIUS_M) state = "arrive_now";
-    else if (distanceM <= APPROACH_RADIUS_M) state = "approaching";
+    // The arrival radius is a floor: a 200 m setting must still leave room to
+    // stand up, so warn no later than the fixed arrive radius.
+    else if (distanceM <= Math.max(approachRadiusM, ARRIVE_RADIUS_M))
+      state = "approaching";
 
     return {
       state,
@@ -149,5 +154,14 @@ export function useRideTracker(
       nearestStop,
       stopsToGo,
     };
-  }, [stops, destinationSeq, position, path, cum, destProjection, stopAlongs]);
+  }, [
+    stops,
+    destinationSeq,
+    position,
+    path,
+    cum,
+    destProjection,
+    stopAlongs,
+    approachRadiusM,
+  ]);
 }

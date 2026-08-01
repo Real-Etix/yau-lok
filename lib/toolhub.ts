@@ -266,13 +266,19 @@ export async function getFacilities(
 
 export type AeHospital = {
   id: string;
-  name: string;
-  district: string;
+  /**
+   * The feed is bilingual and always has been — `name_tc` carries 長洲醫院,
+   * 瑪麗醫院 and the rest. An earlier mapper here read `name_en || name_tc`,
+   * which meant the Chinese name was fetched and then thrown away on every
+   * screen. Both are kept now and the UI picks by reading language.
+   */
+  name: { en: string; tc: string };
+  district: { en: string; tc: string };
   distanceM: number | null;
-  /** Headline median wait, e.g. "3 hours" */
-  wait: string | null;
-  /** Wait once triaged as urgent, e.g. "22 minutes" */
-  urgentWait: string | null;
+  /** Headline median wait, e.g. "3 hours" / "3 小時" */
+  wait: { en: string; tc: string } | null;
+  /** Wait once triaged as urgent */
+  urgentWait: { en: string; tc: string } | null;
 };
 
 /** Live A&E waiting times at public hospitals (Toolhub healthcare_ae_wait). */
@@ -299,14 +305,21 @@ export async function getAeWaits(
         triage?: { urgent?: { p50_en?: string; p50_tc?: string } };
       } | null;
     };
+    const pair = (en?: string | null, tc?: string | null) => ({
+      en: en || tc || "",
+      tc: tc || en || "",
+    });
     return ((body?.data?.results ?? []) as Raw[]).map((h) => ({
       id: h.id,
-      name: h.name_en || h.name_tc || h.id,
-      district: h.district_en || h.district_tc || "",
+      name: pair(h.name_en, h.name_tc) as { en: string; tc: string },
+      district: pair(h.district_en, h.district_tc),
       distanceM: h.distance_meters ?? null,
-      wait: h.wait?.headline?.band_en || h.wait?.headline?.band_tc || null,
-      urgentWait:
-        h.wait?.triage?.urgent?.p50_en || h.wait?.triage?.urgent?.p50_tc || null,
+      wait: h.wait?.headline
+        ? pair(h.wait.headline.band_en, h.wait.headline.band_tc)
+        : null,
+      urgentWait: h.wait?.triage?.urgent
+        ? pair(h.wait.triage.urgent.p50_en, h.wait.triage.urgent.p50_tc)
+        : null,
     }));
   } catch {
     return [];
@@ -510,4 +523,164 @@ export async function getBusRoute(
       lng: s.lng,
     })),
   };
+}
+
+/* ---------------------------------------------------------------------------
+   影餐牌 — reading a 茶餐廳 menu off a photograph.
+
+   This sits with the other model calls by design, so there is one obvious
+   place to swap the engine. It differs from its neighbours in one way worth
+   knowing: recognition runs ON DEVICE.
+
+   HKGAI has nothing to call for this. Checked against the developer portal
+   (hkgai-studio.prod.hkchat.app) on 2026-08-02, not merely inferred:
+
+     Modelhub  text and speech only. One text model, t2_hkgai-v3_fp8_1m_e7,
+               which answers an image with "is not a multimodal model".
+     Speech    TTS, recognition, meeting transcription. Audio, not images.
+     Toolhub   15 tools across geo / transport / weather / facilities /
+               healthcare. No OCR — hence the 404s on every /ocr* path while
+               /weather returns 200 on the same credentials.
+     Agenthub  web search and crawl.  SDKhub  a JS SDK for HKChat embeds.
+
+   So `recogniseMenu` loads Tesseract in the browser instead. No key is
+   involved, which makes the usual "keep it server-side" rule moot; if a
+   vision endpoint ever appears, replace the body of this one function and
+   nothing above it changes.
+
+   Expect this to be imperfect. A 餐牌 is hand-set, often photographed at an
+   angle under fluorescent light. Everything downstream is built for partial
+   results: a line with no confident price is never given one, and the whole
+   feature falls back to CCT_MENU.
+--------------------------------------------------------------------------- */
+
+export type RecognisedItem = {
+  id: string;
+  /** The Chinese as read off the board */
+  zh: string;
+  /** Rendered into the reader's language, when we could */
+  translated?: string;
+  /** Only ever set when a price was actually read. Never inferred. */
+  price?: number;
+  confidence: number;
+  /**
+   * Fractions of the source image (0–1), not pixels. Stored this way so the
+   * outline lands correctly at whatever size the photo is rendered — the
+   * photo is a tap target, and a box in the wrong place is worse than none.
+   */
+  bbox: { x: number; y: number; w: number; h: number };
+};
+
+/** Below this a line goes in the "couldn't read it" hint, not the list. */
+export const OCR_CONFIDENCE_FLOOR = 55;
+
+/** Menu prices are two or three digits, optionally with a $ in front. */
+const PRICE = /(?:\$|＄)?\s*(\d{1,3})(?:\.0)?\s*$/;
+
+/**
+ * Tesseract wants dark text on white at roughly 300 dpi. A phone photo of a
+ * menu is none of those things, so the image is upscaled, desaturated and
+ * contrast-stretched before it goes in. This is the cheapest accuracy win
+ * available and it costs one canvas pass.
+ */
+async function prepare(photo: Blob): Promise<{ canvas: HTMLCanvasElement; w: number; h: number }> {
+  const bitmap = await createImageBitmap(photo);
+  // Small photos read badly; very large ones only cost time.
+  const scale = Math.min(3, Math.max(1, 1600 / Math.max(bitmap.width, 1)));
+  const w = Math.round(bitmap.width * scale);
+  const h = Math.round(bitmap.height * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+
+  const img = ctx.getImageData(0, 0, w, h);
+  const px = img.data;
+
+  // Mean luminance decides where the paper ends and the ink begins.
+  let sum = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    sum += 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+  }
+  const mean = sum / (px.length / 4);
+
+  // Desaturate, and lift contrast only gently. Measured on a test board, a
+  // steep curve (×2.2) traded two correct lines for two wrong ones: Chinese
+  // glyphs have thin strokes and hard contrast eats them. Upscaling is the
+  // part that reliably helps; this only nudges a flat photo.
+  for (let i = 0; i < px.length; i += 4) {
+    const l = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+    const v = Math.max(0, Math.min(255, (l - mean) * 1.25 + 150));
+    px[i] = px[i + 1] = px[i + 2] = v;
+  }
+  ctx.putImageData(img, 0, 0);
+  return { canvas, w, h };
+}
+
+export async function recogniseMenu(photo: Blob): Promise<RecognisedItem[]> {
+  const { createWorker, PSM } = await import("tesseract.js");
+  // Traditional Chinese first, English second — a HK menu mixes both, and
+  // prices are Latin digits.
+  const worker = await createWorker(["chi_tra", "eng"]);
+  try {
+    const { canvas, w: imgW, h: imgH } = await prepare(photo);
+
+    // A menu is a single column of lines, not prose. Telling Tesseract that
+    // stops it hunting for paragraphs that are not there.
+    await worker.setParameters({
+      tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
+      preserve_interword_spaces: "1",
+    });
+
+    const { data } = await worker.recognize(
+      canvas,
+      {},
+      { blocks: true, text: false },
+    );
+
+    const lines =
+      data.blocks?.flatMap((b) =>
+        b.paragraphs.flatMap((p) => p.lines),
+      ) ?? [];
+
+    const out: RecognisedItem[] = [];
+    lines.forEach((line, i) => {
+      const raw = line.text
+        .replace(/\s+/g, " ")
+        // Tesseract spaces CJK glyphs apart; Chinese does not use spaces.
+        .replace(/(?<=[\u3400-\u9fff])\s+(?=[\u3400-\u9fff])/g, "")
+        .trim();
+      if (!raw) return;
+
+      // A menu row is "name .... price". Split the price off the end only
+      // when one is really there; a missing price stays missing.
+      const m = raw.match(PRICE);
+      const zh = (m ? raw.slice(0, m.index).trim() : raw)
+        // dot leaders between name and price
+        .replace(/[.·⋯…\-_\s]+$/, "")
+        .trim();
+      if (!zh) return;
+
+      const item: RecognisedItem = {
+        id: `ocr-${i}`,
+        zh,
+        confidence: line.confidence,
+        bbox: {
+          x: line.bbox.x0 / imgW,
+          y: line.bbox.y0 / imgH,
+          w: (line.bbox.x1 - line.bbox.x0) / imgW,
+          h: (line.bbox.y1 - line.bbox.y0) / imgH,
+        },
+      };
+      // Only attach a price when one was genuinely read.
+      if (m) item.price = Number(m[1]);
+      out.push(item);
+    });
+    return out;
+  } finally {
+    await worker.terminate();
+  }
 }

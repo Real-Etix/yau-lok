@@ -33,6 +33,10 @@ type Props = {
   tall?: boolean;
   /** Route code rendered inside the bus marker, in LED amber */
   routeCode?: string;
+  /** Localised stop label + the get-on / get-off wording for tooltips */
+  stopLabel?: (stop: Stop) => string;
+  /** Route line colour — one per scenario livery */
+  lineTone?: "brand" | "red" | "amber";
 };
 
 export default function RideMap({
@@ -47,6 +51,8 @@ export default function RideMap({
   urgent,
   tall,
   routeCode,
+  stopLabel,
+  lineTone = "brand",
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
@@ -136,7 +142,19 @@ export default function RideMap({
 
     const line: [number, number][] =
       path.length >= 2 ? path : stops.map((s) => [s.lat, s.lng]);
-    const poly = L.polyline(line, { color: "#0f7a52", weight: 7, opacity: 0.9 });
+    // A taxi's line is red, an off-route one amber and dashed — the same
+    // vocabulary the rest of the scenario uses.
+    const LINE = {
+      brand: { color: "#0f7a52", dashArray: undefined },
+      red: { color: "#d7263d", dashArray: undefined },
+      amber: { color: "#b4690e", dashArray: "10 8" },
+    } as const;
+    const poly = L.polyline(line, {
+      color: LINE[lineTone].color,
+      weight: 7,
+      opacity: 0.9,
+      dashArray: LINE[lineTone].dashArray,
+    });
     poly.addTo(map);
     routeLayerRef.current.push(poly);
 
@@ -158,8 +176,8 @@ export default function RideMap({
           })
         : L.circleMarker([s.lat, s.lng], {
             radius: isBoard ? 10 : 6.5,
-            color: isBoard ? "#ffffff" : "#0f7a52",
-            fillColor: isBoard ? "#0f7a52" : "#ffffff",
+            color: isBoard ? "#ffffff" : LINE[lineTone].color,
+            fillColor: isBoard ? LINE[lineTone].color : "#ffffff",
             fillOpacity: 1,
             weight: isBoard ? 4 : 3,
           });
@@ -171,7 +189,7 @@ export default function RideMap({
         });
       } else {
         marker.bindTooltip(
-          `${s.seq}. ${s.name.en}${isBoard ? " (get on)" : isDest ? " (get off)" : ""}`,
+          stopLabel ? stopLabel(s) : `${s.seq}. ${s.name.en}`,
         );
       }
       marker.addTo(map);
@@ -183,7 +201,7 @@ export default function RideMap({
       fittedStopsRef.current = stops;
       map.fitBounds(poly.getBounds(), { padding: [20, 20] });
     }
-  }, [ready, stops, path, boardingSeq, destinationSeq, waitingEtaLabel, urgent]);
+  }, [ready, stops, path, boardingSeq, destinationSeq, waitingEtaLabel, urgent, stopLabel, lineTone]);
 
   // Move the minibus marker; follow it while riding.
   useEffect(() => {

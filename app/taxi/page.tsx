@@ -2,25 +2,37 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { TAXI_PHRASES, TAXI_TIPS, type TaxiPhrase } from "@/data/taxi-phrases";
+import {
+  TAXI_PHRASES,
+  DETOUR_TIPS,
+  PAYING_TIPS,
+  type TaxiPhrase,
+} from "@/data/taxi-phrases";
 import { VOICE_PERSONAS, DEFAULT_PERSONA_KEY } from "@/data/voices";
 import { USER_LANGUAGES, DEFAULT_LANGUAGE_CODE, getLanguage } from "@/data/languages";
 import { useGeolocation, useWakeLock } from "@/hooks/useGeolocation";
-import { cumulativeMeters, projectOntoPath, type LatLng } from "@/lib/geo";
+import { URBAN_TAXI } from "@/lib/taxi";
+import {
+  cumulativeMeters,
+  haversineMeters,
+  projectOntoPath,
+  type LatLng,
+} from "@/lib/geo";
 import { friendlyMicError, listenUserSpeech, speakCantonese } from "@/lib/speech";
 import RideMap from "@/components/RideMap";
-import { Screen, TopBar, Card, SectionLabel, StatusBanner } from "@/components/ui";
+import Meter from "@/components/Meter";
+import PlasticSign from "@/components/PlasticSign";
+import { Screen, TopBar, PressButton, LanguageRow } from "@/components/ui";
 import {
-  PersonStanding,
-  Target,
   Pencil,
   Mic,
   Volume2,
   Car,
-  Navigation,
-  MapPin,
+  Globe,
+  ChevronDown,
+  X,
 } from "lucide-react";
-import { useT } from "@/lib/i18n";
+import { useT, useLanguage } from "@/lib/i18n";
 
 type Plan = {
   distanceM: number;
@@ -39,16 +51,17 @@ const DETOUR_WARN_M = 400;
 /** Consecutive off-route fixes before warning — one bad GPS fix isn't a detour. */
 const DETOUR_STREAK = 3;
 
-const GROUPS: { id: TaxiPhrase["group"]; label: string }[] = [
-  { id: "boarding", label: "Getting in" },
-  { id: "during", label: "On the way" },
-  { id: "paying", label: "Paying" },
+const GROUPS: { id: TaxiPhrase["group"]; key: string }[] = [
+  { id: "boarding", key: "taxi.stageBoarding" },
+  { id: "during", key: "taxi.stageDuring" },
+  { id: "paying", key: "taxi.stagePaying" },
 ];
 
 export default function TaxiPage() {
   const t = useT();
   const [personaKey, setPersonaKey] = useState(DEFAULT_PERSONA_KEY);
-  const [langCode, setLangCode] = useState(DEFAULT_LANGUAGE_CODE);
+  // Same single setting as everywhere else — not a private copy.
+  const { lang: langCode } = useLanguage();
   const [coach, setCoach] = useState(true);
 
   const [originQuery, setOriginQuery] = useState("");
@@ -58,6 +71,10 @@ export default function TaxiPage() {
   const [planError, setPlanError] = useState<string | null>(null);
 
   const [riding, setRiding] = useState(false);
+  // The ride is over when the passenger says so — GPS can't tell paying
+  // apart from sitting in traffic outside the door.
+  const [arrived, setArrived] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [speaking, setSpeaking] = useState<string | null>(null);
   const [detourStreak, setDetourStreak] = useState(0);
 
@@ -76,8 +93,6 @@ export default function TaxiPage() {
   useEffect(() => {
     const v = localStorage.getItem("yau-lok-voice");
     if (v && VOICE_PERSONAS.some((p) => p.key === v)) setPersonaKey(v);
-    const l = localStorage.getItem("yau-lok-lang");
-    if (l && USER_LANGUAGES.some((x) => x.code === l)) setLangCode(l);
   }, []);
 
   const planTrip = useCallback(async () => {
@@ -104,7 +119,7 @@ export default function TaxiPage() {
       if (!res.ok) throw new Error(data.error ?? "could not plan");
       setPlan(data);
     } catch (e) {
-      setPlanError(e instanceof Error ? e.message : "Could not plan that trip");
+      setPlanError(e instanceof Error ? e.message : t("taxi.planError"));
     } finally {
       setPlanning(false);
     }
@@ -130,6 +145,82 @@ export default function TaxiPage() {
   }, [riding, gps.position, routePath, cum]);
 
   const offRoute = detourStreak >= DETOUR_STREAK;
+
+  // --- The meter ----------------------------------------------------------
+  // A real 咪錶 counts money, distance and time itself; this one mirrors it
+  // from the plan and the clock so the passenger has a number to compare
+  // against the dashboard. It is a readout, not a billing system: the fare
+  // climbs in whole dollars off the estimate's own rate, and the distance
+  // integrates the speed we are actually seeing.
+  const [meter, setMeter] = useState({ fare: 0, km: 0, elapsedS: 0, speed: 0 });
+
+  // Speed from successive fixes. The geolocation hook is shared plumbing and
+  // stays as it is, so the arithmetic lives here.
+  const lastFixRef = useRef<{ at: number; pos: LatLng } | null>(null);
+  const [gpsSpeed, setGpsSpeed] = useState<number | null>(null);
+  useEffect(() => {
+    if (!gps.position) return;
+    const now = Date.now();
+    const prev = lastFixRef.current;
+    lastFixRef.current = { at: now, pos: gps.position };
+    if (!prev) return;
+    const dt = (now - prev.at) / 1000;
+    if (dt < 1) return;
+    const kmh = (haversineMeters(prev.pos, gps.position) / dt) * 3.6;
+    setGpsSpeed(Math.min(52, Math.max(0, kmh)));
+  }, [gps.position]);
+
+  useEffect(() => {
+    if (!riding || !plan) return;
+    // Dollars per second: the metered fare above flagfall, spread over the
+    // estimated journey time.
+    const climb = Math.max(0, plan.fare.base - URBAN_TAXI.flagfallHkd);
+    const perSecond = climb / Math.max(60, plan.durationS);
+    const id = setInterval(() => {
+      setMeter((m) => {
+        // Fall back to the trip's own average when there is no fix to
+        // measure against — better than a meter frozen at zero.
+        const avg = (plan.distanceM / 1000 / Math.max(1, plan.durationS / 3600));
+        const speed = Math.min(52, Math.max(0, gpsSpeed ?? avg));
+        return {
+          // Hong Kong meters step in whole dollars, never fractions.
+          fare: Math.round(m.fare + perSecond),
+          km: m.km + speed / 3600,
+          elapsedS: m.elapsedS + 1,
+          speed,
+        };
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [riding, plan, gpsSpeed]);
+
+  // Boarding resets the meter, exactly as the driver drops the flag.
+  useEffect(() => {
+    if (riding && plan) {
+      setMeter({
+        fare: URBAN_TAXI.flagfallHkd,
+        km: 0,
+        elapsedS: 0,
+        speed: 0,
+      });
+    }
+  }, [riding, plan]);
+
+  // How far is left, measured along the planned route rather than as the
+  // crow flies — the same projection the detour watch already uses.
+  const remainingKm = useMemo(() => {
+    if (!plan || !gps.position || routePath.length < 2) {
+      return (plan?.distanceM ?? 0) / 1000;
+    }
+    const here = projectOntoPath(routePath, cum, gps.position);
+    const total = cum[cum.length - 1] ?? 0;
+    return Math.max(0, total - (here?.along ?? 0)) / 1000;
+  }, [plan, gps.position, routePath, cum]);
+
+  // The plate is the one thing a complaint needs. Until a real plate can be
+  // read (camera, or the driver's displayed licence), this is the placeholder
+  // the design shows — never presented as if we had detected it.
+  const plateNumber = "RX 5004";
 
   const speak = useCallback(
     async (p: TaxiPhrase) => {
@@ -161,7 +252,7 @@ export default function TaxiPage() {
         setSayResult(data);
         await speakCantonese(data.cantonese, personaKey);
       } catch (e) {
-        setSayError(e instanceof Error ? e.message : "Could not translate");
+        setSayError(e instanceof Error ? e.message : t("say.error"));
       } finally {
         setSayLoading(false);
       }
@@ -184,312 +275,671 @@ export default function TaxiPage() {
     }
   }, [runSay, langCode]);
 
+  /** Tips are ids; the wording is translatable and lives in the catalogue. */
+  const tipList = (ids: readonly string[]) =>
+    ids.map((id, i) => (
+      <div key={id} className="flex flex-col gap-[3px]">
+        {i > 0 && (
+          <div
+            aria-hidden
+            className="mb-2"
+            style={{ background: "var(--rule)", height: 1 }}
+          />
+        )}
+        <p className="text-[13px] font-bold leading-[1.3]">
+          {t(`taxi.tip.${id}.title`)}
+        </p>
+        <p className="text-[11.5px] leading-[1.6] text-ink-muted">
+          {t(`taxi.tip.${id}.body`)}
+        </p>
+      </div>
+    ));
+
   const mapStops = useMemo(() => {
     if (routePath.length < 2) return [];
     const first = routePath[0];
     const last = routePath[routePath.length - 1];
     return [
-      { seq: 1, name: { en: "Pick-up", tc: "上車" }, lat: first.lat, lng: first.lng },
+      { seq: 1, name: { en: t("taxi.pickUp"), tc: "上車" }, lat: first.lat, lng: first.lng },
       {
         seq: 2,
-        name: { en: plan?.destinationInput ?? "Destination", tc: plan?.destinationChinese ?? "目的地" },
+        name: {
+          en: plan?.destinationInput ?? t("taxi.destination"),
+          tc: plan?.destinationChinese ?? "目的地",
+        },
         lat: last.lat,
         lng: last.lng,
       },
     ];
   }, [routePath, plan]);
+  // ---- The five states of a taxi ride -----------------------------------
+  // Which one you are in follows from what you have actually done, so there
+  // is a single source of truth and no screen can be reached by accident.
+  const phase: "plan" | "show" | "ride" | "pay" = arrived
+    ? "pay"
+    : riding
+      ? "ride"
+      : plan
+        ? "show"
+        : "plan";
 
-  return (
-    <Screen>
-      <TopBar>
-        <button
-          onClick={() => setCoach((c) => !c)}
-          aria-pressed={coach}
-          className={`min-h-11 rounded-full border-2 border-ink px-3 text-xs font-bold uppercase tracking-wide ${
-            coach ? "bg-ink text-white" : "bg-white text-ink-muted"
-          }`}
-        >
-          {t("common.coach")}
-        </button>
-      </TopBar>
+  // Back walks the trip backwards; only 上車前 leaves for the home screen.
+  const onBack =
+    phase === "show"
+      ? () => setPlan(null)
+      : phase === "ride"
+        ? () => setRiding(false)
+        : phase === "pay"
+          ? () => setArrived(false)
+          : undefined;
 
-      <section className="card p-4">
-        <p className="text-base font-extrabold">{t("taxi.whereTo")}</p>
-        <p className="mt-0.5 text-xs text-ink-muted">
-          We&apos;ll show the driver the address in Chinese, estimate the fare,
-          and watch the route while you ride.
-        </p>
-        <span className="field mt-2 block">
-          <span className="field-icon"><PersonStanding className="size-5" aria-hidden strokeWidth={2.2} /></span>
-          <input
-            className="field-input"
-            placeholder="From (e.g. Shek Pai Wan Estate)"
-            value={originQuery}
-            onChange={(e) => setOriginQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && planTrip()}
-          />
+  const boarding = TAXI_PHRASES.filter((p) => p.group === "boarding");
+  const during = TAXI_PHRASES.filter((p) => p.group === "during");
+  const paying = TAXI_PHRASES.filter((p) => p.group === "paying");
+
+  const tolls = plan ? Math.max(0, plan.fare.high - plan.fare.low) : 0;
+
+  /** A phrase the passenger taps to have spoken. */
+  const phraseCard = (p: TaxiPhrase, primary = false) => (
+    <button
+      key={p.id}
+      onClick={() => speak(p)}
+      className={`press min-h-11 w-full rounded-[14px] px-3.5 py-3 text-start ${
+        speaking === p.id ? "ring-2 ring-[var(--sign-amber)]" : ""
+      }`}
+      style={
+        primary
+          ? {
+              background: "var(--sign-red)",
+              boxShadow: "0 4px 0 0 var(--sign-red-deep)",
+            }
+          : {
+              background: "var(--card)",
+              border: "1px solid #ddd7ce",
+              boxShadow: "0 3px 0 0 #ddd7ce",
+            }
+      }
+    >
+      <span
+        className="block text-[16px] font-bold leading-[1.3]"
+        style={{ color: primary ? "#fff" : "var(--ink)" }}
+        lang="zh-HK"
+      >
+        {p.cantonese}
+      </span>
+      <span
+        className="mt-0.5 block text-[11px] leading-[1.4]"
+        style={{ color: primary ? "#ffc9d0" : "var(--ink-faint)" }}
+      >
+        {coach ? `${p.jyutping} · ` : ""}
+        {p.english}
+      </span>
+    </button>
+  );
+
+  const sectionLabel = (text: string) => (
+    <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-faint">
+      {text}
+    </span>
+  );
+
+  /** Pick your language — the same row on every scenario, in taxi red. */
+  const languageRow = <LanguageRow accent="var(--sign-red)" />;
+
+  /** 講嘢 — hold to talk, or type. Shared by the plan and ride screens. */
+  const sayBlock = (
+    <div className="card flex flex-col gap-2.5 rounded-[18px] p-3.5">
+      {sectionLabel(t("taxi.sayAnythingLabel"))}
+      <PressButton tone="red" onClick={sayByVoice} disabled={sayListening || sayLoading}>
+        <span className="flex items-center justify-center gap-2.5">
+          <Mic className="size-5" aria-hidden strokeWidth={2.2} />
+          {sayListening
+            ? t("say.listening")
+            : sayLoading
+              ? t("say.translating")
+              : t("taxi.holdToTalk")}
         </span>
+      </PressButton>
+      <label
+        className="flex min-h-12 items-center gap-2.5 rounded-[12px] px-3.5 py-3"
+        style={{ border: "1.5px solid #ddd7ce" }}
+      >
+        <Pencil className="size-5 shrink-0 text-ink-faint" aria-hidden strokeWidth={2.2} />
+        <input
+          className="min-w-0 flex-1 bg-transparent text-[14px] outline-none"
+          placeholder={t("taxi.orType")}
+          value={sayText}
+          onChange={(e) => setSayText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && runSay(sayText)}
+        />
+      </label>
+      {sayError && (
+        <p className="text-[12px] text-[var(--sign-red)]">{sayError}</p>
+      )}
+      {sayResult && (
         <button
-          onClick={() => {
-            setWantLocation(true);
-            setOriginQuery("");
-          }}
-          className="mt-1 text-xs font-medium text-[var(--sign-blue)]"
+          onClick={() => speakCantonese(sayResult.cantonese, personaKey)}
+          className="press rounded-[14px] bg-ink p-3.5 text-center text-white"
         >
-          {gps.position
-            ? `using my location (±${Math.round(gps.accuracy ?? 0)} m)`
-            : wantLocation
-              ? "locating…"
-              : "or start from my location"}
-        </button>
-        {wantLocation && gps.error && (
-          <p className="mt-1 text-xs text-[var(--sign-red)]">{gps.error}</p>
-        )}
-        <div className="mt-2 flex gap-2">
-          <span className="field min-w-0 flex-1">
-            <span className="field-icon"><Target className="size-5" aria-hidden strokeWidth={2.2} /></span>
-            <input
-              className="field-input"
-              placeholder="To (e.g. Times Square)"
-              value={destQuery}
-              onChange={(e) => setDestQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && planTrip()}
-            />
+          <span className="sign-zh block text-[24px]" lang="zh-HK">
+            {sayResult.cantonese}
           </span>
-          <button
-            onClick={planTrip}
-            disabled={planning || !destQuery.trim()}
-            className="rounded-xl bg-[var(--sign-blue)] px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
-          >
-            {planning ? "…" : "Plan"}
-          </button>
-        </div>
-        {planError && <p className="mt-2 text-sm text-[var(--sign-red)]">{planError}</p>}
-      </section>
+          {coach && (
+            <span className="mt-1 block text-[12px] opacity-75">
+              {sayResult.jyutping}
+            </span>
+          )}
+          <span className="mt-0.5 block text-[12px] opacity-75">
+            {sayResult.back}
+          </span>
+        </button>
+      )}
+    </div>
+  );
 
-      {plan && (
-        <>
-          {/* The single most useful thing: something the driver can read */}
-          <section className="plate p-5 text-center">
-            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-              Show this to the driver
+  const meterStats: [string, string, string] = [
+    `${meter.km.toFixed(2)} km`,
+    `${Math.floor(meter.elapsedS / 60)}m ${String(Math.floor(meter.elapsedS % 60)).padStart(2, "0")}s`,
+    `${meter.speed.toFixed(1)} km/h`,
+  ];
+
+  // ------------------------------------------------------------ 01 上車前
+  if (phase === "plan") {
+    return (
+      <Screen tone="taxi" flush>
+        <TopBar variant="taxi" title={t("taxi.title")} onBack={onBack}>
+          <span className="rounded-full bg-white/20 px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white">
+            {t("common.demoShort")}
+          </span>
+        </TopBar>
+
+        <div className="flex flex-col gap-[13px] px-[18px] py-4">
+          {/* The roof sign: you are in the taxi world now. */}
+          <PlasticSign compact>
+            <span className="flex items-center justify-center gap-3.5">
+              <span
+                style={{ font: "900 26px/1 'Noto Sans HK',sans-serif", color: "#c8102e" }}
+                lang="zh-HK"
+              >
+                {t("home.taxi")}
+              </span>
+              <span
+                aria-hidden
+                style={{ background: "rgba(20,17,15,.35)", width: 2, height: 24 }}
+              />
+              <span
+                className="sign-zh"
+                style={{ fontSize: 20, letterSpacing: ".24em" }}
+              >
+                {t("taxi.roofSign")}
+              </span>
+            </span>
+          </PlasticSign>
+
+          <div
+            className="card flex flex-col gap-2.5 rounded-[18px] p-3.5"
+            style={{ boxShadow: "0 3px 0 0 var(--sign-red)" }}
+          >
+            <label
+              className="flex min-h-12 items-center gap-2.5 rounded-[12px] px-3.5 py-3"
+              style={{ border: "1.5px solid #ddd7ce" }}
+            >
+              <span
+                aria-hidden
+                className="size-[9px] shrink-0 rounded-full"
+                style={{ background: "var(--ink-muted)" }}
+              />
+              <input
+                className="min-w-0 flex-1 bg-transparent text-[15px] outline-none"
+                placeholder={t("taxi.fromPlaceholder")}
+                value={originQuery}
+                onChange={(e) => setOriginQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && planTrip()}
+              />
+            </label>
+            <label
+              className="flex min-h-12 items-center gap-2.5 rounded-[12px] px-3.5 py-3"
+              style={{
+                border: `1.5px solid ${destQuery ? "var(--sign-red)" : "#ddd7ce"}`,
+                boxShadow: destQuery ? "0 0 0 3.5px rgba(215,38,61,.14)" : undefined,
+              }}
+            >
+              <span
+                aria-hidden
+                className="size-[9px] shrink-0 rounded-[2px]"
+                style={{ background: "var(--sign-red)" }}
+              />
+              <input
+                className="min-w-0 flex-1 bg-transparent text-[15px] outline-none"
+                placeholder={t("taxi.toPlaceholder")}
+                value={destQuery}
+                onChange={(e) => setDestQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && planTrip()}
+              />
+            </label>
+            <PressButton
+              tone="red"
+              onClick={planTrip}
+              disabled={planning || !destQuery.trim()}
+              className="rounded-[12px]"
+            >
+              {planning ? "…" : t("taxi.calcFare")}
+            </PressButton>
+            <button
+              onClick={() => {
+                setWantLocation(true);
+                setOriginQuery("");
+              }}
+              className="min-h-11 text-start text-[12px] font-bold"
+              style={{ color: "var(--sign-red)" }}
+            >
+              {gps.position
+                ? `${t("taxi.usingMyLocation")} (±${Math.round(gps.accuracy ?? 0)} m)`
+                : wantLocation
+                  ? t("taxi.locating")
+                  : t("taxi.useMyLocation")}
+            </button>
+            {wantLocation && gps.error && (
+              <p className="text-[12px] text-[var(--sign-red)]">{gps.error}</p>
+            )}
+            {planError && (
+              <p className="text-[12px] text-[var(--sign-red)]">{planError}</p>
+            )}
+          </div>
+
+          {/* The estimate, read off a meter — the object this trip is about. */}
+          {sectionLabel(t("taxi.fareEstimate"))}
+          <Meter
+            fare={plan ? plan.fare.low : 0}
+            extras={tolls}
+            size="md"
+            stats={
+              plan
+                ? [
+                    `${(plan.distanceM / 1000).toFixed(1)} km`,
+                    `${t("plan.minutesUnit") === "min" ? "≈" : "約"} ${Math.round(plan.durationS / 60)} min`,
+                    t("taxi.tollRow"),
+                  ]
+                : ["— km", "— min", t("taxi.tollRow")]
+            }
+          />
+          <p className="text-[12px] leading-[1.6] text-ink-muted">
+            {t("taxi.estimateNote")}
+          </p>
+
+          {languageRow}
+          {sayBlock}
+
+          <p className="mt-auto pt-1 text-center text-[11px] font-medium leading-[1.6] text-ink-faint">
+            {t("taxi.tariffNote")}
+          </p>
+        </div>
+      </Screen>
+    );
+  }
+
+  // ---------------------------------------------------------- 02 俾司機睇
+  if (phase === "show") {
+    return (
+      <Screen tone="taxi" flush>
+        <TopBar variant="taxi" title={t("taxi.showDriver")} onBack={onBack} />
+
+        <div className="flex flex-col gap-3.5 p-[18px]">
+          <p className="text-center text-[11px] font-extrabold uppercase tracking-[0.16em] text-ink-faint">
+            {t("taxi.holdItUp")}
+          </p>
+
+          {/* The whole point of the screen: something a driver can read. */}
+          <PlasticSign>
+            <p
+              style={{
+                font: "900 13px/1 'Noto Sans HK',sans-serif",
+                letterSpacing: ".2em",
+                color: "rgba(20,17,15,.6)",
+              }}
+              lang="zh-HK"
+            >
+              {t("taxi.pleaseGoTo")}
             </p>
-            <p className="sign-zh mt-1 text-[2.5rem] text-[var(--sign-red)]" lang="zh-HK">
-              {plan.destinationChinese ?? plan.destinationInput}
+            <p
+              className="mt-2 break-words"
+              style={{
+                font: "900 44px/1.15 'Noto Sans HK',sans-serif",
+                color: "#c8102e",
+              }}
+              lang="zh-HK"
+            >
+              {plan?.destinationChinese ?? plan?.destinationInput}
             </p>
-            {plan.destinationAddress && (
-              <p className="sign-zh mt-2 text-xl text-[var(--sign-blue)]" lang="zh-HK">
+            {plan?.destinationAddress && (
+              <p
+                className="mt-2"
+                style={{ font: "700 17px/1.4 'Noto Sans HK',sans-serif" }}
+                lang="zh-HK"
+              >
                 {plan.destinationAddress}
               </p>
             )}
-            <p className="mt-1 text-sm text-ink-muted">
-              {plan.destinationInput}
-            </p>
-            <button
-              onClick={() =>
-                speakCantonese(
-                  `唔該，去${plan.destinationChinese ?? plan.destinationInput}。`,
-                  personaKey,
-                )
-              }
-              className="mt-3 w-full rounded-xl bg-ink py-3 font-semibold text-white transition active:scale-95"
+            <p
+              style={{
+                font: "500 13px/1.4 var(--font-archivo),sans-serif",
+                color: "rgba(20,17,15,.62)",
+              }}
             >
-              <span className="flex items-center justify-center gap-2"><Volume2 className="size-5" aria-hidden />{t("taxi.sayCantonese")}</span>
-            </button>
-          </section>
-
-          <section className="card p-4">
-            <div className="flex items-baseline justify-between">
-              <span className="text-sm font-semibold">
-                About HK${plan.fare.low}–{plan.fare.high}
-              </span>
-              <span className="text-xs text-ink-muted">
-                {(plan.distanceM / 1000).toFixed(1)} km ·{" "}
-                {Math.round(plan.durationS / 60)} min
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-ink-muted">
-              Estimate from the urban (red) taxi scale for this distance, with
-              an allowance for traffic. <strong>Excludes</strong> tunnel tolls,
-              luggage and pet surcharges, so the meter can legitimately read
-              more. Verify current rates on td.gov.hk.
+              {plan?.destinationInput}
             </p>
-          </section>
+          </PlasticSign>
+
+          <PressButton
+            tone="ink"
+            tall
+            onClick={() =>
+              speakCantonese(
+                plan?.destinationChinese ?? plan?.destinationInput ?? "",
+                personaKey,
+              )
+            }
+          >
+            <span className="flex items-center justify-center gap-2.5 text-[17px]">
+              <Volume2 className="size-5" aria-hidden strokeWidth={2.2} />
+              {t("taxi.readAloud")}
+            </span>
+          </PressButton>
+
+          <div className="card flex items-center justify-between gap-2 rounded-[16px] px-3.5 py-3">
+            <span className="sign-zh text-[15px]">
+              {t("taxi.estimateRange")
+                .replace("{low}", String(plan?.fare.low ?? 0))
+                .replace("{high}", String(plan?.fare.high ?? 0))}
+            </span>
+            <span className="shrink-0 text-[12px] font-medium text-ink-muted">
+              {((plan?.distanceM ?? 0) / 1000).toFixed(1)} km ·{" "}
+              {Math.round((plan?.durationS ?? 0) / 60)} min
+            </span>
+          </div>
+
+          {sectionLabel(t("taxi.sayOnBoarding"))}
+          <div className="flex flex-col gap-2.5">
+            {boarding.map((p) => phraseCard(p))}
+          </div>
+
+          <PressButton
+            tone="white"
+            className="mt-auto rounded-[12px] border-[1.5px] shadow-none"
+            onClick={() => setRiding(true)}
+          >
+            <span className="flex items-center justify-center gap-2.5 text-[15px]">
+              <Car className="size-5" aria-hidden strokeWidth={2.2} />
+              {t("taxi.inTaxi")}
+            </span>
+          </PressButton>
+        </div>
+      </Screen>
+    );
+  }
+
+  // ------------------------------------------- 03 車程中 / 04 偏離路線
+  if (phase === "ride") {
+    return (
+      <Screen tone="taxi" flush>
+        <TopBar variant="taxi" title={t("taxi.stageDuring")} onBack={onBack}>
+          {/* The pill is the state: white-on-red tracking, amber when adrift */}
+          <span
+            className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5"
+            style={{
+              background: offRoute ? "#ffde59" : "rgba(0,0,0,.22)",
+            }}
+          >
+            <span
+              aria-hidden
+              className="soft-pulse size-[7px] rounded-full"
+              style={{ background: offRoute ? "var(--ink)" : "#ffde59" }}
+            />
+            <span
+              className="text-[10px] font-extrabold uppercase tracking-[0.12em]"
+              style={{ color: offRoute ? "var(--ink)" : "#fff" }}
+            >
+              {offRoute ? t("taxi.offRoutePill") : t("taxi.gpsTracking")}
+            </span>
+          </span>
+        </TopBar>
+
+        <div className="flex flex-col gap-3 px-4 pb-4 pt-3.5">
+          {offRoute && (
+            <div
+              className="rounded-[16px] px-4 py-[15px]"
+              style={{
+                background: "var(--sign-amber-soft)",
+                border: "2px solid var(--sign-amber)",
+              }}
+            >
+              <p
+                className="sign-zh text-[19px] leading-[1.3]"
+                style={{ color: "var(--sign-amber)" }}
+              >
+                {t("taxi.offRouteTitle")}
+              </p>
+              <p
+                className="mt-1 text-[13px] leading-[1.6]"
+                style={{ color: "#8a5309" }}
+              >
+                {t("taxi.offRouteBody")
+                  .replace("{m}", String(Math.round(lastOffsetRef.current ?? 0)))
+                  .replace("{n}", String(detourStreak))}
+              </p>
+              <PressButton
+                tone="ink"
+                tall
+                className="mt-3 rounded-[12px]"
+                onClick={() => speakCantonese("請問行邊條路？", personaKey)}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <Volume2 className="size-5" aria-hidden strokeWidth={2.2} />
+                  {t("taxi.whichWayQ")}
+                </span>
+              </PressButton>
+            </div>
+          )}
+
+          {/* Running meter — large while on route, a reference when adrift. */}
+          <Meter
+            fare={meter.fare}
+            extras={tolls}
+            hired
+            size={offRoute ? "sm" : "lg"}
+            stats={meterStats}
+          />
 
           <RideMap
             stops={mapStops}
-            path={plan.path}
+            path={plan?.path ?? []}
             position={gps.position}
             boardingSeq={1}
             destinationSeq={2}
-            riding={riding}
+            riding
             accuracyM={gps.accuracy}
+            lineTone={offRoute ? "amber" : "red"}
           />
 
-          {!riding ? (
-            <button
-              onClick={() => setRiding(true)}
-              className="rounded-2xl bg-[var(--sign-blue)] p-5 text-center text-lg font-semibold text-white shadow-lg transition active:scale-95"
+          {!offRoute && (
+            <div
+              className="rounded-[14px] px-3.5 py-3 text-center"
+              style={{ background: "var(--sign-green-soft)" }}
             >
-              <span className="flex items-center justify-center gap-2"><Car className="size-5" aria-hidden />{t("taxi.inTaxi")}</span>
-              <span className="mt-0.5 block text-sm font-normal opacity-85">
-                uses GPS, keeps the screen awake
-              </span>
-            </button>
-          ) : (
-            <section
-              className={`rounded-2xl p-4 text-center ${
-                offRoute
-                  ? "bg-[var(--sign-amber-soft)] text-[var(--sign-amber)]"
-                  : "bg-[var(--sign-green-soft)] text-[var(--sign-green)]"
-              }`}
-            >
-              <p className="text-lg font-semibold">
-                {offRoute ? "You're off the planned route" : "On the planned route"}
-              </p>
-              <p className="mt-1 text-sm">
-                {offRoute
-                  ? "This can be a normal diversion — roadworks or traffic. If you're unsure, ask the driver which way they're going."
-                  : gps.position
-                    ? `following your position · ±${Math.round(gps.accuracy ?? 0)} m`
-                    : "waiting for GPS fix…"}
-              </p>
-              {offRoute && (
-                <button
-                  onClick={() =>
-                    speakCantonese("請問行邊條路？", personaKey)
-                  }
-                  className="mt-2 w-full rounded-xl bg-white/80 py-2.5 font-semibold"
-                >
-                  <span className="flex items-center justify-center gap-2"><Volume2 className="size-4" aria-hidden />「請問行邊條路？」</span>
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  setRiding(false);
-                  setDetourStreak(0);
-                }}
-                className="mt-2 rounded-lg bg-white/70 px-3 py-1.5 text-sm font-medium"
+              <p
+                className="sign-zh text-[16px] leading-[1.3]"
+                style={{ color: "var(--sign-green)" }}
               >
-                Arrived — stop watching
-              </button>
-            </section>
+                {t("taxi.onRouteTitle")}
+              </p>
+              <p
+                className="mt-0.5 text-[12px] leading-[1.4]"
+                style={{ color: "var(--sign-green)" }}
+              >
+                {t("taxi.onRouteDetail")
+                  .replace("{dist}", `${remainingKm.toFixed(1)} km`)
+                  .replace("{acc}", String(Math.round(gps.accuracy ?? 0)))}
+              </p>
+            </div>
           )}
-        </>
-      )}
 
-      <section className="card p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-          Say anything · AI
-        </p>
-        <label className="mt-2 block">
-          <span className="mb-1 block text-xs font-medium text-ink-muted">I speak</span>
-          <span className="field">
-            <span className="field-icon"><Volume2 className="size-5" aria-hidden strokeWidth={2.2} /></span>
-            <select
-              className="field-select"
-              value={langCode}
-              onChange={(e) => {
-                setLangCode(e.target.value);
-                localStorage.setItem("yau-lok-lang", e.target.value);
-              }}
-            >
-              {USER_LANGUAGES.map((l) => (
-                <option key={l.code} value={l.code}>{l.label}</option>
-              ))}
-            </select>
-          </span>
-        </label>
-        <button
-          onClick={sayByVoice}
-          disabled={sayListening || sayLoading}
-          className={`mt-2 w-full rounded-xl p-3.5 text-center font-semibold text-white transition active:scale-95 disabled:opacity-70 ${
-            sayListening ? "animate-pulse bg-[var(--sign-red)]" : "bg-[var(--sign-blue)]"
-          }`}
-        >
-          {sayListening ? t("say.listening") : sayLoading ? "Translating…" : t("say.speak")}
-        </button>
-        <div className="mt-2 flex gap-2">
-          <span className="field min-w-0 flex-1">
-            <span className="field-icon"><Pencil className="size-5" aria-hidden strokeWidth={2.2} /></span>
-            <input
-              className="field-input"
-              placeholder="…or type it — any language"
-              value={sayText}
-              onChange={(e) => setSayText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && runSay(sayText)}
-            />
-          </span>
-          <button
-            onClick={() => runSay(sayText)}
-            disabled={sayLoading || sayListening || !sayText.trim()}
-            className="rounded-xl bg-ink px-4 text-sm font-medium text-white shadow-sm transition active:scale-95 disabled:opacity-40"
-          >
-            {sayLoading ? "…" : "Say it"}
-          </button>
-        </div>
-        {sayError && <p className="mt-2 text-sm text-[var(--sign-red)]">{sayError}</p>}
-        {sayResult && (
-          <button
-            onClick={() => speakCantonese(sayResult.cantonese, personaKey)}
-            className="mt-2 w-full rounded-xl bg-ink p-3 text-center text-white transition active:scale-95"
-          >
-            <span className="block text-2xl font-bold">{sayResult.cantonese}</span>
-            {coach && (
-              <span className="mt-0.5 block text-xs opacity-80">{sayResult.jyutping}</span>
-            )}
-            <span className="mt-0.5 block text-xs opacity-80">
-              {sayResult.back} · tap to repeat
-            </span>
-          </button>
-        )}
-      </section>
-
-      {GROUPS.map((g) => (
-        <section key={g.id}>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-muted">
-            {g.label}
-          </p>
-          <div className="space-y-2">
-            {TAXI_PHRASES.filter((p) => p.group === g.id).map((p) => (
-              <button
-                key={p.id}
-                onClick={() => speak(p)}
-                className={`w-full card p-3 text-left transition active:scale-95 ${
-                  speaking === p.id ? "ring-2 ring-[var(--sign-amber)]" : ""
-                }`}
+          {offRoute && (
+            <>
+              {sectionLabel(t("taxi.noteTheTaxi"))}
+              <div
+                className="card flex items-center gap-3.5 rounded-[16px] p-3.5"
+                style={{ boxShadow: "0 3px 0 0 #ddd7ce" }}
               >
-                <span className="block text-base font-semibold">{p.cantonese}</span>
-                {coach && (
-                  <span className="block text-xs text-ink-muted">{p.jyutping}</span>
-                )}
-                <span className="block text-xs text-ink-muted">{p.english}</span>
-              </button>
-            ))}
+                <span
+                  className="shrink-0 px-[11px] py-2"
+                  style={{
+                    background: "#ffde59",
+                    border: "2.5px solid var(--ink)",
+                    borderRadius: 6,
+                    font: "900 20px/1 var(--font-archivo),sans-serif",
+                    letterSpacing: ".06em",
+                  }}
+                >
+                  {plateNumber}
+                </span>
+                <span className="flex min-w-0 flex-col gap-[3px]">
+                  <span className="text-[13px] font-bold leading-[1.3]">
+                    {t("taxi.plateNoted")}
+                  </span>
+                  <span className="text-[11px] leading-[1.4] text-ink-muted">
+                    {t("taxi.plateNotedSub")}
+                  </span>
+                </span>
+              </div>
+              <div className="card flex flex-col gap-[11px] rounded-[16px] p-3.5">
+                {tipList(DETOUR_TIPS)}
+              </div>
+            </>
+          )}
+
+          {!offRoute && (
+            <>
+              {sectionLabel(t("taxi.duringPhrases"))}
+              <div className="flex flex-col gap-2.5">
+                {during.map((p) => phraseCard(p))}
+              </div>
+              <PressButton
+                tone="white"
+                className="rounded-[12px] border-[1.5px] shadow-none"
+                onClick={() => setComposerOpen(true)}
+              >
+                <span className="flex items-center justify-center gap-2.5 text-[15px]">
+                  <Mic className="size-5" aria-hidden strokeWidth={2.2} />
+                  {t("taxi.saySomethingElse")}
+                </span>
+              </PressButton>
+            </>
+          )}
+
+          <PressButton
+            tone="red"
+            tall
+            className="mt-auto rounded-[14px]"
+            onClick={() => setArrived(true)}
+          >
+            {t("taxi.arrivedStop")}
+          </PressButton>
+        </div>
+
+        {composerOpen && (
+          <div className="fixed inset-0 z-[1500] flex items-end justify-center bg-black/50 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div className="max-h-[80dvh] w-full max-w-md overflow-y-auto">
+              <div className="mb-2 flex justify-end">
+                <button
+                  onClick={() => setComposerOpen(false)}
+                  aria-label={t("alert.dismiss")}
+                  className="flex size-11 items-center justify-center rounded-full bg-white/15 text-white"
+                >
+                  <X className="size-5" aria-hidden />
+                </button>
+              </div>
+              {sayBlock}
+            </div>
           </div>
-        </section>
-      ))}
+        )}
+      </Screen>
+    );
+  }
 
-      <section className="card p-4">
-        <p className="text-sm font-semibold">Know where you stand</p>
-        <ul className="mt-2 space-y-2.5">
-          {TAXI_TIPS.map((t) => (
-            <li key={t.title}>
-              <p className="text-sm font-medium">{t.title}</p>
-              <p className="text-xs leading-relaxed text-ink-muted">{t.body}</p>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-3 text-xs text-ink-faint">
-          General information based on Transport Department guidance — not
-          legal advice. Check td.gov.hk for the current rules and complaint
-          channels.
-        </p>
-      </section>
+  // ------------------------------------------------------- 05 落車找數
+  const meterDue = meter.fare;
+  const totalDue = meterDue + tolls;
+  return (
+    <Screen tone="taxi" flush>
+      <TopBar variant="taxi" title={t("taxi.payTitle")} onBack={onBack}>
+        <span className="rounded-full bg-white/20 px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white">
+          {t("taxi.arrivedPill")}
+        </span>
+      </TopBar>
 
-      <p className="pb-4 text-center text-xs text-ink-faint">
-        Routes and addresses via HKGAI Toolhub · Cantonese spoken by HKGAI
-      </p>
+      <div className="flex flex-col gap-3 px-4 pb-4 pt-3.5">
+        <Meter
+          fare={meterDue}
+          extras={tolls}
+          size="lg"
+          stats={[
+            `${meter.km.toFixed(1)} km`,
+            `${Math.floor(meter.elapsedS / 60)}m ${String(Math.floor(meter.elapsedS % 60)).padStart(2, "0")}s`,
+            "0.0 km/h",
+          ]}
+        />
+
+        {/* What you actually hand over, itemised so nothing is a surprise. */}
+        <div className="card flex flex-col gap-2 rounded-[16px] p-3.5">
+          <div className="flex justify-between text-[14px] font-medium text-ink-muted">
+            <span>{t("taxi.meterRow")}</span>
+            <span>${meterDue.toFixed(1)}</span>
+          </div>
+          <div className="flex justify-between text-[14px] font-medium text-ink-muted">
+            <span>{t("taxi.tollRow")}</span>
+            <span>${tolls.toFixed(1)}</span>
+          </div>
+          <div aria-hidden style={{ background: "var(--rule)", height: 1 }} />
+          <div className="flex items-baseline justify-between">
+            <span className="sign-zh text-[17px]">{t("taxi.totalRow")}</span>
+            <span
+              className="text-[26px] font-black"
+              style={{ color: "var(--sign-red)" }}
+            >
+              ${totalDue.toFixed(1)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2.5">
+          {paying.map((p) => phraseCard(p, p.id === "receipt"))}
+        </div>
+
+        <div className="card rounded-[16px] p-3.5">
+          <p className="sign-zh text-[14px] leading-[1.3]">
+            {t("taxi.rightsTitleZh")}
+          </p>
+          <div className="mt-2.5 flex flex-col gap-2.5">
+            {tipList(PAYING_TIPS)}
+          </div>
+          <p className="mt-2.5 text-[10.5px] leading-[1.5] text-ink-faint">
+            {t("taxi.notLegalAdvice")}
+          </p>
+        </div>
+
+        <PressButton
+          tone="white"
+          className="mt-auto rounded-[12px] border-[1.5px] shadow-none"
+          onClick={() => {
+            setArrived(false);
+            setRiding(false);
+            setPlan(null);
+            setDetourStreak(0);
+          }}
+        >
+          {t("taxi.newTrip")}
+        </PressButton>
+      </div>
     </Screen>
   );
 }
