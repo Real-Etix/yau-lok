@@ -360,7 +360,123 @@ export const GROUT =
   "repeating-linear-gradient(0deg, rgba(0,0,0,.14) 0 1.5px, transparent 1.5px 13px)," +
   "repeating-linear-gradient(90deg, rgba(0,0,0,.14) 0 1.5px, transparent 1.5px 13px)";
 
-/** Scenario row: glyph tile, title, one line of context. */
+/**
+ * The number plate bolted to the right edge of a scenario row.
+ *
+ * Each scenario states its one live figure in its own material — dot-matrix
+ * amber for the minibus, meter red for the taxi, plate blue on ambulance
+ * yellow for A&E, melamine on tile for the 茶餐廳 — so the row is legible as
+ * that thing before any word is read. Full-bleed by design: the panel runs to
+ * the card's edges, which is why the row clips its own corners.
+ */
+export function NumberPanel({
+  value,
+  unit,
+  prefix,
+  caption,
+  background,
+  overlay,
+  valueFont,
+  valueColor,
+  unitColor,
+  captionColor,
+  captionFont = "800 9.5px/1 var(--font-archivo), sans-serif",
+  captionSpacing = ".14em",
+  stripe,
+  clamp,
+}: {
+  value: string;
+  /** 分鐘 / 小時 — set small beside the figure so the figure stays the figure */
+  unit?: string | null;
+  /** The taxi's $, which leads the number rather than following it */
+  prefix?: string;
+  caption: string;
+  background: string;
+  /** SCANLINES or GROUT, when the material has a texture */
+  overlay?: string;
+  valueFont: string;
+  valueColor: string;
+  unitColor?: string;
+  captionColor: string;
+  captionFont?: string;
+  captionSpacing?: string;
+  /** A&E only: battenburg along the panel's top edge */
+  stripe?: boolean;
+  /** The 茶餐廳 panel carries a chit line, not a figure — let it wrap twice */
+  clamp?: boolean;
+}) {
+  const placeholder = value === "—";
+  return (
+    <span
+      className="relative flex w-[104px] shrink-0 flex-col items-center justify-center gap-1 self-stretch overflow-hidden px-1"
+      style={{ background }}
+    >
+      {stripe && (
+        <span className="absolute inset-x-0 top-0">
+          <Battenburg height={6} />
+        </span>
+      )}
+      <span className="flex max-w-full items-baseline justify-center gap-[3px]">
+        {prefix && (
+          <span
+            className="shrink-0 text-[19px] font-black leading-none"
+            style={{ color: unitColor ?? valueColor }}
+          >
+            {prefix}
+          </span>
+        )}
+        {/* A dash is a placeholder, not a value — fade it so it never reads as
+            a redaction bar. Opacity only: `font` is a shorthand, and pairing it
+            with a conditional fontWeight makes React drop one of the two. */}
+        <span
+          className={clamp ? "line-clamp-2 text-center" : "truncate"}
+          style={{
+            font: valueFont,
+            color: valueColor,
+            opacity: placeholder ? 0.45 : undefined,
+          }}
+          lang="zh-HK"
+        >
+          {value}
+        </span>
+        {unit && !placeholder && (
+          <span
+            className="shrink-0 text-[10.5px] font-extrabold leading-none"
+            style={{ color: unitColor ?? valueColor }}
+          >
+            {unit}
+          </span>
+        )}
+      </span>
+      <span
+        className="text-center"
+        style={{
+          font: captionFont,
+          color: captionColor,
+          letterSpacing: captionSpacing,
+        }}
+      >
+        {caption}
+      </span>
+      {overlay && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{ backgroundImage: overlay }}
+        />
+      )}
+    </span>
+  );
+}
+
+/**
+ * Scenario row: glyph tile, title, one line of context — and, on the home
+ * screen, a full-bleed NumberPanel and an optional drawer beneath.
+ *
+ * When `children` are present the card stops being a single link: the row
+ * itself stays a link, and the drawer sits outside it, because a button
+ * nested inside an anchor is neither valid HTML nor reachable by keyboard.
+ */
 export function ScenarioTile({
   href,
   glyph,
@@ -372,6 +488,9 @@ export function ScenarioTile({
   raised,
   glyphColor = "#fff",
   glyphMosaic,
+  panel,
+  badge,
+  children,
 }: {
   href: string;
   /** The single Chinese character on the tile, in the LED face */
@@ -387,54 +506,101 @@ export function ScenarioTile({
   glyphColor?: string;
   /** The 茶 tile is tiled wall too, not flat green */
   glyphMosaic?: boolean;
+  /** The 104px live-number plate on the trailing edge */
+  panel?: React.ReactNode;
+  /** A pill beside the title — 追蹤緊 while a ride is running */
+  badge?: React.ReactNode;
+  /** The drawer under the row, shown when this scenario is in progress */
+  children?: React.ReactNode;
 }) {
   const inner = (
     <>
       <span
         aria-hidden
-        className="flex size-12 shrink-0 items-center justify-center rounded-[13px]"
+        className="flex size-10 shrink-0 items-center justify-center rounded-[12px]"
         style={{
           background: color,
           backgroundImage: glyphMosaic ? GROUT : undefined,
           color: glyphColor,
           fontFamily: "var(--font-dot), monospace",
-          fontSize: 22,
+          fontSize: 19,
           lineHeight: 1,
         }}
       >
         {glyph}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex items-center gap-[7px]">
-          <span className="sign-zh text-[17px] leading-tight">{title}</span>
+        <span className="flex flex-wrap items-center gap-[7px]">
+          <span className="sign-zh text-[16px] font-black leading-tight">
+            {title}
+          </span>
+          {badge}
           {!live && (
             <span className="rounded-full bg-[var(--rule)] px-[7px] py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-ink-muted">
               {soonLabel}
             </span>
           )}
         </span>
-        <span className="block text-[13px] leading-snug text-ink-muted">
+        <span className="block text-[11.5px] font-medium leading-snug text-ink-muted">
           {subtitle}
         </span>
       </span>
     </>
   );
 
-  if (!live) {
+  // Without a panel this stays the plain padded row the other screens use.
+  if (!panel) {
+    if (!live) {
+      return (
+        <div className="card flex items-center gap-3 rounded-[18px] p-3 opacity-50">
+          {inner}
+        </div>
+      );
+    }
     return (
-      <div className="card flex items-center gap-3 rounded-[18px] p-3 opacity-50">
+      <Link
+        href={href}
+        className="press card flex min-h-16 items-center gap-3 rounded-[18px] p-3"
+        style={raised ? { boxShadow: "0 3px 0 0 var(--brand)" } : undefined}
+      >
         {inner}
-      </div>
+      </Link>
     );
   }
+
+  const row = (
+    <>
+      <span className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-[15px]">
+        {inner}
+      </span>
+      {panel}
+    </>
+  );
+
   return (
-    <Link
-      href={href}
-      className="press card flex min-h-16 items-center gap-3 rounded-[18px] p-3"
-      style={raised ? { boxShadow: "0 3px 0 0 var(--brand)" } : undefined}
+    <div
+      className="card overflow-hidden rounded-[16px]"
+      style={{
+        opacity: live ? 1 : 0.5,
+        boxShadow: raised ? "0 3px 0 0 var(--brand-deep)" : undefined,
+      }}
     >
-      {inner}
-    </Link>
+      {live ? (
+        <Link href={href} className="press flex min-h-16 items-stretch">
+          {row}
+        </Link>
+      ) : (
+        <div className="flex min-h-16 items-stretch">{row}</div>
+      )}
+      {children && (
+        <div
+          className="flex flex-col gap-[9px] px-3 pb-3 pt-2.5"
+          style={{ borderTop: "1px solid var(--rule)" }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 

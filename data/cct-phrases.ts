@@ -135,7 +135,7 @@ export const CCT_TWEAK_LIST: CctTweak[] = [
   { id: "fe-zau", chit: "啡走", group: "drink" },
   { id: "joeng-zau", chit: "鴦走", group: "drink" },
   { id: "fei-saa", chit: "飛沙走奶", group: "drink" },
-  { id: "loeng-caa", chit: "涼茶", group: "drink" },
+  { id: "zau-naai", chit: "走奶", group: "drink" },
 
   // 跟餐 — rice, noodles and the plate itself
   { id: "gaa-dai", chit: "加底", group: "set" },
@@ -153,7 +153,7 @@ export const CCT_TWEAK_LIST: CctTweak[] = [
   { id: "caau-daan", chit: "炒蛋", group: "extra" },
   { id: "gaa-daan", chit: "加蛋", group: "extra", surchargeHkd: 6 },
   { id: "zau-laat", chit: "走辣", group: "extra" },
-  { id: "mou-cing-gwaa", chit: "唔要青瓜", group: "extra" },
+  { id: "zau-cing-gwaa", chit: "走青瓜", group: "extra" },
   { id: "custom", chit: "", group: "extra", custom: true },
 ];
 

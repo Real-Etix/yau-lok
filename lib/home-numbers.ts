@@ -100,7 +100,10 @@ export function useNearestAeWait() {
         // English side — the digits are the same in both.
         const m = first.wait?.en.match(/([\d.]+)\s*(hours?|minutes?)/i);
         if (m) {
-          setValue(m[1]);
+          // The HA feed bands a median of under an hour as "0 hour". Printed
+          // as a bare 0 on the plate that reads as a broken figure rather than
+          // as good news, so state the band it actually means.
+          setValue(Number(m[1]) === 0 ? "<1" : m[1]);
           setUnit(/hour/i.test(m[2]) ? "hours" : "minutes");
         }
       })

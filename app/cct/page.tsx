@@ -16,6 +16,7 @@ import {
   CCT_TWEAKS,
   CCT_RULES,
   CCT_MENU,
+  cctTweak,
   type CctPhrase,
   type CctItem,
 } from "@/data/cct-phrases";
@@ -64,17 +65,20 @@ export default function CctPage() {
 
   const chosen = CCT_MENU.filter((m) => picked.includes(m.id));
   const total = chosen.reduce((sum, m) => sum + m.price, 0);
-  const tweakText = tweaks.map((k) => t(`cct.tweak.${k}`)).join(" ");
+  // The chit carries the trade shorthand and nothing else. A waiter writes
+  // 走冰, never 唔要冰 and never "no ice" — putting the translated gloss on the
+  // paper would hand the kitchen a phrase in the wrong register, which is the
+  // exact opposite of what this app is for.
+  const tweakText = tweaks.map((k) => cctTweak(k)?.chit ?? "").join(" ");
 
-  // The chit is written the way a waiter writes it: shorthand, and the
-  // tweaks trailing the drink they belong to.
   const chitItems = chosen.map((m) => ({
     label:
       m.kind === "drink" && tweakText ? `${m.chit} ${tweakText}` : m.chit,
     price: m.price,
   }));
 
-  // Every code and tweak on the chit, decoded once, with no trailing dot.
+  // Every code and tweak on the chit, decoded once, with no trailing dot. The
+  // shorthand is the term; the translation is what explains it.
   const legend: { term: string; gloss?: string }[] = [
     ...chosen
       .filter((m) => m.tone === "code")
@@ -83,7 +87,10 @@ export default function CctPage() {
         return code ? { term: code.code, gloss: t(code.key) } : null;
       })
       .filter((x): x is { term: string; gloss: string } => x !== null),
-    ...tweaks.map((k) => ({ term: t(`cct.tweak.${k}`) })),
+    ...tweaks.map((k) => ({
+      term: cctTweak(k)?.chit ?? k,
+      gloss: t(`cct.tweak.${k}`),
+    })),
   ];
 
   const orderPhrase = CCT_PHRASES.find((p) => p.id === "order-please")!;
@@ -337,19 +344,34 @@ export default function CctPage() {
           <div className="flex flex-wrap gap-2">
             {CCT_TWEAKS.map((k) => {
               const on = tweaks.includes(k);
+              const gloss = t(`cct.tweak.${k}`);
               return (
                 <button
                   key={k}
                   onClick={() => setTweaks((s) => toggle(s, k))}
                   aria-pressed={on}
-                  className="min-h-11 rounded-full px-3.5 py-[9px] text-[14px] font-extrabold"
+                  aria-label={`${cctTweak(k)?.chit} — ${gloss}`}
+                  className="flex min-h-11 flex-col items-start gap-[2px] rounded-[14px] px-3 py-[7px]"
                   style={{
                     background: on ? "var(--sign-red)" : "#fff",
-                    color: on ? "#fff" : "var(--ink)",
                     border: `1.5px solid ${on ? "var(--sign-red)" : "var(--rule)"}`,
                   }}
                 >
-                  {t(`cct.tweak.${k}`)}
+                  {/* The shorthand leads. It is what gets written and what a
+                      waiter recognises; the translation is the footnote. */}
+                  <span
+                    className="sign-zh text-[15px] leading-none"
+                    style={{ color: on ? "#fff" : "var(--ink)" }}
+                    lang="zh-HK"
+                  >
+                    {cctTweak(k)?.chit}
+                  </span>
+                  <span
+                    className="text-[10.5px] font-medium leading-tight"
+                    style={{ color: on ? "rgba(255,255,255,.85)" : "var(--ink-muted)" }}
+                  >
+                    {gloss}
+                  </span>
                 </button>
               );
             })}
