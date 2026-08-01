@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { getAeWaits, getRouteEta } from "@/lib/toolhub";
 import { URBAN_TAXI, estimateUrbanFare } from "@/lib/taxi";
 import { useSavedRoutes, useStored } from "@/lib/prefs";
+import { useBilingual } from "@/lib/i18n";
 import { useGeolocation } from "@/hooks/useGeolocation";
 
 const DASH = "—";
@@ -24,9 +25,9 @@ const DASH = "—";
  */
 export function useNextMinibus() {
   const { saved, recent } = useSavedRoutes();
+  const bi = useBilingual();
   const route = saved[0] ?? recent[0] ?? null;
   const [value, setValue] = useState(DASH);
-  const [routeLine, setRouteLine] = useState<string | null>(null);
 
   useEffect(() => {
     if (!route?.originLat || !route.originLng) return;
@@ -49,11 +50,12 @@ export function useNextMinibus() {
     };
   }, [route]);
 
-  useEffect(() => {
-    if (route) setRouteLine(`${route.routeCode} · ${route.to}`);
-  }, [route]);
+  // Derived, not stored: the stop names are held in both scripts, so this
+  // has to re-resolve when the reader switches language.
+  const routeLine = route ? `${route.routeCode} · ${bi(route.to)}` : null;
+  const boardingAt = route ? bi(route.from) : null;
 
-  return { value, routeLine, route };
+  return { value, routeLine, boardingAt, route };
 }
 
 /** 的士 — the estimate to wherever they went last, else the flagfall. */

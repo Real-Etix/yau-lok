@@ -554,13 +554,15 @@ export default function RidePage() {
         id: routeRef?.routeId ?? `${routeCompany}-${displayRouteCode}`,
         routeCode: displayRouteCode,
         company: routeCompany,
-        from: stopName(stops[boardingIdx]).primary,
-        to: stopName(destStop).primary,
+        // Both scripts, so the saved route reads in whatever language the
+        // rider is using later — not the one they happened to save it in.
+        from: stops[boardingIdx]?.name,
+        to: destStop.name,
         fare: fare ?? undefined,
         originLat: stops[boardingIdx]?.lat,
         originLng: stops[boardingIdx]?.lng,
       },
-    [routeRef, routeCompany, displayRouteCode, stops, boardingIdx, destStop, fare, stopName],
+    [routeRef, routeCompany, displayRouteCode, stops, boardingIdx, destStop, fare],
   );
   const saveThisRoute = useCallback(() => {
     const route = currentSavedRoute();

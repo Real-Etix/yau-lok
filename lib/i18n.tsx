@@ -137,18 +137,26 @@ export function useSimplify() {
   );
 }
 
+/** A place name kept in both scripts, so the reader picks it, not the writer. */
+export type NamePair = { en: string; tc: string };
+
 /**
  * Picks the reader's side of any bilingual `{ en, tc }` the Hong Kong feeds
  * return — hospital names, districts, waiting-time bands. Mandarin readers
  * get the Traditional text converted, exactly as stop names are.
+ *
+ * A bare string is passed through unchanged: saved routes written before this
+ * carry one resolved name rather than a pair, and re-rendering that in another
+ * language is not possible — but neither is losing it.
  */
 export function useBilingual() {
   const { lang } = useContext(LanguageContext);
   const chinese = lang === "zhHant" || lang === "cmn";
   const sc = useSimplify();
   return useCallback(
-    (pair?: { en: string; tc: string } | null) => {
+    (pair?: NamePair | string | null) => {
       if (!pair) return "";
+      if (typeof pair === "string") return pair;
       return chinese ? sc(pair.tc) || pair.en : pair.en || pair.tc;
     },
     [chinese, sc],

@@ -80,7 +80,7 @@ export default function Home() {
           strokeWidth={2.4}
         />
         <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold text-ink-muted">
-          {minibus.route?.from ?? t("home.minibusIdle")}
+          {minibus.boardingAt || t("home.minibusIdle")}
         </span>
         <LanguageRow accent="var(--brand)" compact />
       </div>

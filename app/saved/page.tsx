@@ -9,13 +9,14 @@ import LedBoard from "@/components/LedBoard";
 import { Screen, TopBar, Card, SectionLabel } from "@/components/ui";
 import { useSavedRoutes, type SavedRoute } from "@/lib/prefs";
 import { getRouteEta } from "@/lib/toolhub";
-import { useT } from "@/lib/i18n";
+import { useT, useBilingual } from "@/lib/i18n";
 
 type EtaMap = Record<string, number[]>;
 
 export default function SavedPage() {
   const t = useT();
   const { saved, recent, toggle } = useSavedRoutes();
+  const bi = useBilingual();
   const [etas, setEtas] = useState<EtaMap>({});
 
   // Live arrivals for saved routes. Failures stay silent — the offline
@@ -69,7 +70,7 @@ export default function SavedPage() {
                 <LedBoard size="chip" primary={r.routeCode} className="shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="sign-zh text-[15px]">
-                    {r.from} → {r.to}
+                    {bi(r.from)} → {bi(r.to)}
                   </p>
                   {r.note && (
                     <p className="mt-0.5 text-[13px] text-ink-muted">{r.note}</p>
@@ -137,7 +138,7 @@ export default function SavedPage() {
                 >
                   <LedBoard size="chip" primary={r.routeCode} className="shrink-0" />
                   <p className="min-w-0 flex-1 truncate text-[14px]">
-                    {r.from} → {r.to}
+                    {bi(r.from)} → {bi(r.to)}
                   </p>
                   {r.note && (
                     <span className="shrink-0 text-[13px] text-ink-faint">

@@ -5,13 +5,21 @@
 // list is usable offline).
 
 import { useCallback, useRef, useSyncExternalStore } from "react";
+import type { NamePair } from "@/lib/i18n";
 
 export type SavedRoute = {
   id: string;
   routeCode: string;
   company: string;
-  from: string;
-  to: string;
+  /**
+   * Both scripts, never one resolved name. Saving the string the screen
+   * happened to be showing froze the route into whatever language was
+   * selected at the time, so a stop saved while reading 简体中文 stayed
+   * simplified forever after. Older entries are plain strings and still
+   * render — see `useBilingual`.
+   */
+  from: NamePair | string;
+  to: NamePair | string;
   /** e.g. "返工 · 平日 08:10" */
   note?: string;
   fare?: number;
