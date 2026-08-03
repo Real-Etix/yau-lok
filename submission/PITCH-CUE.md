@@ -4,8 +4,12 @@
 Everything you need to say is already on the slides in type large enough to
 read, so you are prompting from the screen, not reading a script.
 
-Open **http://localhost:3001/pitch.html**, press **F** for fullscreen.
-→ or space to advance · ← back.
+**Open the deck by double-clicking `submission/pitch/pitch.html`.** It is
+standalone — relative paths, no server — because a dev server that dies
+mid-recording costs you the whole take. (`http://localhost:3001/pitch.html`
+is the same deck if the server happens to be up, but do not rely on it.)
+
+Press **F** for fullscreen. → or space to advance · ← back.
 
 Record with **⌘⇧5 → Record Entire Screen**, microphone on. **One take.** If you
 fumble a sentence, keep going — it is a pitch, not a film.

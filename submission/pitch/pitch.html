@@ -1,0 +1,211 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>有落 Yau Lok — pitch</title>
+<!--
+  A deck built to be RECORDED IN ONE TAKE, not to be read from.
+
+  THIS COPY IS STANDALONE — double-click it. Every path is relative and there
+  is no server involved, because a dev server that dies mid-recording costs
+  you the whole take.
+  Arrow keys or space to advance, ← to go back, F for fullscreen.
+
+  Two decisions come from having under an hour: every slide carries its own
+  prompts in type large enough to talk from, so there are no speaker notes to
+  hide from the screen recording; and the product is shown as stills pulled
+  from the real recordings, because the demo video is a separate deliverable
+  and nothing should have to be switched to mid-take.
+-->
+<style>
+  :root {
+    --paper:#EDE6DA; --ink:#14100C; --muted:#6B6155; --faint:#9E968D;
+    --green:#0F7A52; --red:#C8102E; --amber:#FFB020; --led:#0A0A0A;
+    --yellow:#F5DE00; --blue:#12507E;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#000;overflow:hidden;
+    font-family:"PingFang HK","Heiti TC",-apple-system,"Segoe UI",sans-serif}
+  #deck{position:relative;width:100vw;height:100vh}
+  .s{position:absolute;inset:0;display:none;flex-direction:column;
+     justify-content:center;padding:6vh 8vw;background:var(--paper);color:var(--ink)}
+  .s.on{display:flex}
+  h1{font-size:clamp(38px,6.4vw,104px);font-weight:900;line-height:1.05;letter-spacing:-.01em}
+  h2{font-size:clamp(26px,3.4vw,54px);font-weight:900;line-height:1.15;margin-bottom:.5em}
+  p,li{font-size:clamp(17px,1.85vw,32px);font-weight:600;line-height:1.5;color:var(--muted)}
+  .lead{color:var(--ink);font-weight:800}
+  ul{margin-top:.9em;padding-left:1.1em;display:flex;flex-direction:column;gap:.45em}
+  .kicker{font-size:clamp(12px,1.05vw,18px);font-weight:800;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--faint);margin-bottom:1.1em}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:4vw;margin-top:.6em}
+  .big{font-size:clamp(40px,5.6vw,92px);font-weight:900;line-height:1;color:var(--green)}
+  .tag{display:inline-block;padding:.28em .7em;border-radius:.5em;font-size:.62em;
+    font-weight:900;vertical-align:middle}
+  .grid4{display:grid;grid-template-columns:repeat(2,1fr);gap:1.6vw;margin-top:1em}
+  .card{padding:1.1em 1.2em;border-radius:14px;color:#fff}
+  .card b{display:block;font-size:clamp(20px,2.1vw,36px);font-weight:900;margin-bottom:.15em}
+  .card span{font-size:clamp(13px,1.25vw,21px);font-weight:600;opacity:.9}
+
+  /* slide 1 + 10: the destination board */
+  .board{background:var(--led);color:var(--amber);border-radius:18px;
+    padding:5vh 5vw;text-align:center;box-shadow:inset 0 0 0 3px #2a2a2a}
+  .board .zh{font-size:clamp(56px,11vw,190px);font-weight:900;line-height:1}
+  .board .en{font-size:clamp(14px,1.7vw,30px);letter-spacing:.36em;color:#FF8A00;margin-top:.5em}
+
+  video{width:auto;max-width:100%;max-height:84vh;border-radius:14px;background:#000;
+    display:block;margin:0 auto}
+  .shots{display:grid;grid-template-columns:repeat(4,1fr);gap:1.6vw;margin-top:.4em;align-items:end}
+  .shots img{width:100%;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.22);display:block}
+  .shots figcaption{margin-top:.7em;font-size:clamp(11px,1.05vw,18px);font-weight:700;
+    color:var(--muted);text-align:center}
+
+  #bar{position:fixed;left:0;bottom:0;height:5px;background:var(--green);
+    width:0;transition:width .25s;z-index:5}
+  #num{position:fixed;right:18px;bottom:14px;font-size:13px;font-weight:800;
+    color:var(--faint);z-index:5}
+</style>
+
+<div id="deck">
+
+<section class="s">
+  <div class="board">
+    <div class="zh">有落</div>
+    <div class="en">YAU LOK!</div>
+  </div>
+  <p class="lead" style="text-align:center;margin-top:4vh;font-size:clamp(20px,2.4vw,42px)">
+    知你幾時要落車 —— 唔使開口都落到車。</p>
+  <p style="text-align:center;margin-top:1.4vh;color:var(--faint)">
+    Firebird Hackathon · Enterprise Track · HKGAI 港話通</p>
+</section>
+
+<section class="s">
+  <div class="kicker">The thesis</div>
+  <h1>A translation app answers.<br>It never speaks first.</h1>
+  <div class="cols">
+    <div><h2 style="color:var(--faint)">翻譯 app</h2>
+      <p>你要知道問乜、幾時問、點問。<br>Reactive. You must already know.</p></div>
+    <div><h2 style="color:var(--green)">有落</h2>
+      <p class="lead">佢知你幾時要落車，主動幫你講。<br>It knows the moment, and speaks.</p></div>
+  </div>
+</section>
+
+<section class="s">
+  <div class="kicker">Who it is for</div>
+  <h2>Not tourists. People who live here.</h2>
+  <ul>
+    <li><span class="lead">370,000+ domestic helpers</span> — Indonesian, Filipino, Thai</li>
+    <li><span class="lead">Non-Chinese-speaking residents</span> — Nepali, Urdu, Hindi</li>
+    <li><span class="lead">New arrivals and visitors</span> — Mandarin, English</li>
+  </ul>
+  <p class="big" style="margin-top:1em">9 languages · 579 strings</p>
+</section>
+
+<section class="s">
+  <div class="kicker">Four moments</div>
+  <h2>Four places Cantonese is not optional.</h2>
+  <div class="grid4">
+    <div class="card" style="background:var(--green)"><b>綠色小巴</b><span>No bell. You shout, or you walk back.</span></div>
+    <div class="card" style="background:var(--red)"><b>的士</b><span>Say the destination. Watch the route.</span></div>
+    <div class="card" style="background:var(--yellow);color:var(--blue)"><b>急症室</b><span>Describe symptoms under pressure.</span></div>
+    <div class="card" style="background:var(--green)"><b>茶餐廳</b><span>Order in the waiter's own shorthand.</span></div>
+  </div>
+</section>
+
+<section class="s">
+  <div class="kicker">The hard one</div>
+  <h1>It shouts <span style="color:var(--red)">有落</span> for you.</h1>
+  <ul>
+    <li>Live arrivals and stop tracking from the government minibus feed</li>
+    <li class="lead">The alert fires on the lock screen — phone in your pocket</li>
+    <li>One tap and HKGAI speaks the Cantonese out loud</li>
+  </ul>
+</section>
+
+<section class="s">
+  <div class="kicker">It runs — this is the real thing</div>
+  <div class="shots">
+    <figure><img src="shots/riding.png" alt=""><figcaption>車程中 · live tracking</figcaption></figure>
+    <figure><img src="shots/alert.png" alt=""><figcaption>就到喇 · on the lock screen</figcaption></figure>
+    <figure><img src="shots/symptoms.png" alt=""><figcaption>講病情 · your words, in Cantonese</figcaption></figure>
+    <figure><img src="shots/chit.png" alt=""><figcaption>落單紙 · the chit, in shorthand</figcaption></figure>
+  </div>
+</section>
+
+<section class="s">
+  <div class="kicker">The part a translator cannot do</div>
+  <h1 style="color:var(--red);font-family:'Noto Sans HK',sans-serif">0T 走冰 少甜</h1>
+  <p class="lead" style="margin-top:.5em">The shorthand the kitchen reads — not a translation.</p>
+  <ul>
+    <li>「no ice」 on the chit is useless. 走冰 is what a waiter writes.</li>
+    <li>25 tweaks, 29 dishes, every one in the register a kitchen accepts</li>
+    <li>The translation sits underneath, for the person holding the phone</li>
+  </ul>
+</section>
+
+<section class="s">
+  <div class="kicker">Built on HKGAI, end to end</div>
+  <h2>Every Cantonese word you heard came from HKGAI.</h2>
+  <ul>
+    <li><span class="lead">Modelhub</span> — Cantonese generation and speech</li>
+    <li><span class="lead">Toolhub</span> — transport, geo, weather, healthcare</li>
+    <li><span class="lead">Agenthub</span> — service status and live answers</li>
+    <li>Government open data: minibus arrivals, Hospital Authority A&amp;E waits</li>
+  </ul>
+</section>
+
+<section class="s">
+  <div class="kicker">What we chose not to fake</div>
+  <h2>The menu OCR is on-device, and it is imperfect.</h2>
+  <ul>
+    <li>It reads prices reliably and hand-set Chinese names poorly</li>
+    <li class="lead">So it never invents a price it could not read — it asks you</li>
+    <li>Every line is editable, and the whole feature degrades to a known menu</li>
+    <li>HKGAI has no vision model today. We did not pretend otherwise.</li>
+  </ul>
+</section>
+
+<section class="s" data-video>
+  <video id="demo" src="demo-2min.mp4" controls preload="auto" playsinline></video>
+</section>
+
+<section class="s">
+  <div class="board" style="padding:4vh 4vw">
+    <div class="zh" style="font-size:clamp(44px,8vw,140px)">有落</div>
+    <div class="en">YAU-LOK.VERCEL.APP</div>
+  </div>
+  <p class="lead" style="text-align:center;margin-top:3.5vh;font-size:clamp(20px,2.4vw,42px)">
+    It runs right now, on your phone, in nine languages.</p>
+  <p style="text-align:center;margin-top:1.2vh;color:var(--faint)">唔使驚 · 我幫你講</p>
+</section>
+
+</div>
+
+<div id="bar"></div><div id="num"></div>
+
+<script>
+  const slides = [...document.querySelectorAll('.s')];
+  const bar = document.getElementById('bar');
+  const video = document.getElementById('demo');
+  const num = document.getElementById('num');
+  let i = 0;
+
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle('on', k === i));
+    bar.style.width = ((i + 1) / slides.length * 100) + '%';
+    num.textContent = (i + 1) + ' / ' + slides.length;
+    // Leaving the demo must stop it, or its audio keeps running under the
+    // closing slide and lands in the recording.
+    if (video && !slides[i].hasAttribute('data-video')) video.pause();
+  }
+
+  addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); show(i + 1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); show(i - 1); }
+    else if (e.key === 'Home') show(0);
+    else if (e.key === 'End') show(slides.length - 1);
+    else if (e.key.toLowerCase() === 'f') {
+      document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    }
+  });
+  addEventListener('click', (e) => { if (e.target.tagName !== 'VIDEO') show(i + 1); });
+  show(0);
+</script>
