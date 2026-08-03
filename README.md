@@ -7,7 +7,7 @@ your stop.** It fuses GPS + Hong Kong open transport data + HKGAI's Cantonese
 models to speak up at the right moment — and coaches you so you need it less
 over time (human-AI symbiosis, not replacement).
 
-## The hero scenario: red minibus
+## The hero scenario: green minibus (專線小巴)
 
 No stop announcements, no bell — you must shout 「唔該，有落！」 at the right
 moment. The app:
