@@ -585,10 +585,17 @@ const PRICE = /(?:\$|＄)?\s*(\d{1,3})(?:\.0)?\s*$/;
  */
 async function prepare(photo: Blob): Promise<{ canvas: HTMLCanvasElement; w: number; h: number }> {
   const bitmap = await createImageBitmap(photo);
-  // Small photos read badly; very large ones only cost time.
-  const scale = Math.min(3, Math.max(1, 1600 / Math.max(bitmap.width, 1)));
-  const w = Math.round(bitmap.width * scale);
-  const h = Math.round(bitmap.height * scale);
+  // Aim for a longest side of ~1800px, in either direction. The old rule only
+  // ever scaled *up*, which meant a 12-megapixel phone photo went into
+  // Tesseract untouched: getImageData alone allocates ~48 MB for one of those,
+  // and on a phone the recognition that follows either takes minutes or dies
+  // quietly and returns nothing. Downscaling is not a quality loss here —
+  // Tesseract wants text about 30–40px tall, and a full-frame photo of a menu
+  // has far more than that to spare.
+  const longest = Math.max(bitmap.width, bitmap.height, 1);
+  const scale = Math.min(3, 1800 / longest);
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
 
   const canvas = document.createElement("canvas");
   canvas.width = w;
@@ -622,9 +629,14 @@ async function prepare(photo: Blob): Promise<{ canvas: HTMLCanvasElement; w: num
 
 export async function recogniseMenu(photo: Blob): Promise<RecognisedItem[]> {
   const { createWorker, PSM } = await import("tesseract.js");
-  // Traditional Chinese first, English second — a HK menu mixes both, and
-  // prices are Latin digits.
-  const worker = await createWorker(["chi_tra", "eng"]);
+  // Traditional Chinese ALONE, deliberately. Loading `eng` alongside it lets
+  // Tesseract score a Latin reading against a Chinese one per line, and on a
+  // menu it frequently prefers the Latin: measured on a clean board, 乾炒牛河
+  // came back as "LACE ST)" and 沙嗲牛肉麵 as "pg Set]". chi_tra already
+  // contains Latin letters and digits, so prices still read correctly — every
+  // price in that same test was right both ways. English costs accuracy here
+  // and buys nothing.
+  const worker = await createWorker(["chi_tra"]);
   try {
     const { canvas, w: imgW, h: imgH } = await prepare(photo);
 
