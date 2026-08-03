@@ -1,77 +1,89 @@
 1
-00:00:01,000 --> 00:00:05,640
+00:00:01,000 --> 00:00:05,460
 喺香港，難嘅唔係聽，係開口。
-In Hong Kong the problem isn't understanding Cantonese —
-it's having to speak it.
+The problem isn't understanding Cantonese.
+It's having to speak it.
 
 2
-00:00:14,523 --> 00:00:18,983
+00:00:14,523 --> 00:00:19,023
 綠色小巴冇按鈴，唔嗌就過咗站。
 A green minibus has no bell.
 You shout 「有落」 — or you miss your stop.
 
 3
-00:00:33,023 --> 00:00:36,363
-有落知道你去邊，夠鐘幫你嗌。
-Yau Lok knows where you're going,
-and says it out loud for you.
+00:00:35,023 --> 00:00:40,143
+一路數住仲有幾多個站，仲有幾遠。
+On board, it counts the stops
+and the distance still to go.
 
 4
-00:00:57,023 --> 00:01:01,403
-落車提示同到站時間，全部實時。
-Stop alerts and live arrivals,
-from the government's own minibus feed.
+00:00:57,023 --> 00:01:00,963
+落車嗰句連拼音都寫定咗。
+The line you need, with romanisation —
+readable even if you can't speak it.
 
 5
-00:01:23,529 --> 00:01:28,949
+00:01:15,023 --> 00:01:19,763
+夠鐘就震同出聲，一撳就幫你嗌。
+It buzzes on the lock screen.
+One tap, and it speaks for you.
+
+6
+00:01:23,529 --> 00:01:29,109
 上車前就知幾錢，講清楚目的地。
 Know the fare before you get in —
 and say the destination clearly.
 
-6
-00:01:35,029 --> 00:01:38,529
-真實香港咪錶，唔使淨係信個數。
-A real Hong Kong meter, so nobody
-has to take the number on trust.
-
 7
-00:01:47,799 --> 00:01:52,879
-急症室輪候時間，直接嚟自醫管局。
-A&E waits are live,
-straight from the Hospital Authority.
+00:01:35,029 --> 00:01:38,809
+行遠咗會提你，但唔會亂咁賴司機。
+If the taxi strays off route it says so —
+without accusing anyone.
 
 8
-00:02:01,299 --> 00:02:05,939
-分流同收費寫得清楚，唔會靠估。
-Triage levels and fees, stated plainly —
-never guessed.
+00:01:47,299 --> 00:01:50,199
+急症室分五級，唔係先到先得。
+A&E triage runs five levels —
+it isn't first come, first served.
 
 9
-00:02:15,564 --> 00:02:19,744
-茶餐廳最難嘅，係伙記寫嗰啲字。
-The hard part of a cha chaan teng isn't the food.
-It's what the waiter writes.
+00:01:54,299 --> 00:01:57,379
+講病情，用你自己嘅話講就得。
+Describe your symptoms
+in your own language.
 
 10
-00:02:28,564 --> 00:02:34,084
+00:02:02,299 --> 00:02:06,999
+即刻變廣東話，仲有拼音照住讀。
+Cantonese back, with romanisation
+so you can read it aloud.
+
+11
+00:02:15,564 --> 00:02:19,824
+茶餐廳最難嘅，係伙記寫嗰啲字。
+The hard part isn't the food.
+It's what the waiter writes.
+
+12
+00:02:28,564 --> 00:02:33,944
 「0T 走冰 少甜」——廚房睇得明嘅寫法。
 「0T 走冰 少甜」 — the shorthand
 the kitchen reads, not a translation.
 
-11
-00:02:44,397 --> 00:02:47,617
+13
+00:02:44,397 --> 00:02:47,657
 影低塊餐牌，就可以直接落單。
 Photograph the menu
 and order straight off it.
 
-12
-00:02:54,397 --> 00:02:58,977
+14
+00:02:54,397 --> 00:02:59,117
 認錯咗？改得。價錢唔會靠估。
 Misread a line? Fix it. We never invent
 a price the camera couldn't read.
 
-13
-00:03:09,416 --> 00:03:12,596
+15
+00:03:09,416 --> 00:03:12,316
 九種語言，唔止中英文。
 Nine languages —
 not just Chinese and English.
