@@ -45,14 +45,20 @@ next-env.d.ts
 # local editor/agent config
 .claude/
 
-# demo video working files
-submission/clips/*.mov
-submission/clips/*.mp4
-submission/narration.wav
-submission/yau-lok-demo.mp4
-submission/.build/
-submission/.narr/
-submission/yau-lok-demo-2min.mp4
+# Submission and production material. This repository is the application: it
+# should clone, install and run, and nothing more. Pitch scripts, decks,
+# narration, screen recordings and the finished videos all live on disk but
+# are deliberately not part of it.
+submission/
+public/pitch.html
+public/menu-board.html
+public/shots/
+*.mp4
+*.mov
+*.m4a
+*.wav
+# ...except the app's own pre-rendered Cantonese, which it needs to run.
+!public/audio/*.wav
 
 # internal design handoffs, not part of the product
 design_handoff_gmb_green_theme*/
