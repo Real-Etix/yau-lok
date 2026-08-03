@@ -42,6 +42,22 @@ for entry in "${ORDER[@]}"; do
   for ext in mov mp4 m4v MOV MP4; do
     [ -f "$CLIPS/$name.$ext" ] && { src="$CLIPS/$name.$ext"; break; }
   done
+
+  # The closing card is generated, not filmed — a photograph of a laptop
+  # showing a QR would be the one non-app frame in the video and would look
+  # it. A recorded 08-close still wins if you made one.
+  if [ -z "$src" ] && [ "$name" = "08-close" ] && [ -f assets/close-card.png ]; then
+    ffmpeg -y -loglevel error -loop 1 -t "$secs" -i assets/close-card.png \
+      -f lavfi -t "$secs" -i anullsrc=channel_layout=stereo:sample_rate=48000 \
+      -vf "scale=1080:1920,fps=30,setsar=1" -map 0:v -map 1:a \
+      -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p \
+      -c:a aac -b:a 160k -ar 48000 "$WORK/$name.mp4"
+    echo "file '$name.mp4'" >> "$LIST"
+    TOTAL=$((TOTAL + secs))
+    echo "    ok $name (${secs}s, from close-card.png)"
+    continue
+  fi
+
   if [ -z "$src" ]; then
     echo "    !! missing $CLIPS/$name.(mov|mp4) — skipping"
     continue

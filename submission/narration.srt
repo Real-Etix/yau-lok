@@ -71,11 +71,6 @@ not just Chinese and English.
 00:03:47,000 --> 00:03:56,000
 Bahasa · Tagalog · Nepali · Urdu · Hindi · Thai
 
-16
-00:03:59,000 --> 00:04:06,000
-有落 — don't worry, I'll say it for you.
-
-17
-00:04:06,500 --> 00:04:10,000
-yau-lok.vercel.app
-Cantonese narration by HKGAI text-to-speech
+# Nothing over the closing card from 3:57. It already sets the tagline, the
+# URL and the credits as type; a subtitle on top would only collide with them.
+# The Cantonese line still plays — it just is not captioned twice.

@@ -62,7 +62,7 @@ start of each file.
 | `05-cct.mov` | 0:45 | Back → 茶餐廳 → 開始落單 → tap 檸茶, then **走冰** and **走甜** → 寫張單 → hold on the chit reading `0T 走冰 走甜` → tap 讀廣東話俾伙記聽. |
 | `06-scan.mov` | 0:40 | 影張餐牌落單 → take/choose the photo → the recognised lines appear → **tap 改 on a line it got wrong and fix it** → build the chit. |
 | `07-language.mov` | 0:25 | Home → language pill → **Bahasa Indonesia** → let the whole UI flip → switch again to **اردو** so the layout mirrors right-to-left. |
-| `08-close.mov` | 0:13 | Open `submission/assets/yau-lok-qr.png` full screen next to the URL. |
+| `08-close` | 0:13 | **Nothing to record.** `assemble.sh` builds this from `assets/close-card.png` — the 有落 mark, the QR, and the URL, composed at full 1080×1920 so it cuts sharp against the recordings. Rebuild it with `bash submission/make-close-card.sh` if the URL changes. |
 
 **Clip 05 and 06 are the two that win.** 05 is the only moment where the app
 writes something a stranger has to act on, and 06 is where you show the OCR
