@@ -1,76 +1,65 @@
 1
-00:00:00,400 --> 00:00:11,500
+00:00:01,000 --> 00:00:05,680
 In Hong Kong the problem isn't understanding Cantonese —
 it's having to speak it.
 
 2
-00:00:14,000 --> 00:00:28,000
+00:00:14,523 --> 00:00:19,143
 A green minibus has no bell.
 You shout 「有落」 — or you miss your stop.
 
 3
-00:00:30,000 --> 00:00:42,000
+00:00:33,023 --> 00:00:36,403
 Yau Lok knows where you're going,
 and says it out loud for you.
 
 4
-00:00:44,000 --> 00:00:55,000
-Live arrivals and stop alerts,
+00:00:57,023 --> 00:01:01,723
+Stop alerts and live arrivals,
 from the government's own minibus feed.
 
 5
-00:00:59,000 --> 00:01:12,000
+00:01:23,529 --> 00:01:28,409
 Know the fare before you get in —
 and say the destination clearly.
 
 6
-00:01:14,000 --> 00:01:29,000
+00:01:35,029 --> 00:01:38,409
 A real Hong Kong meter, so nobody
 has to take the number on trust.
 
 7
-00:01:34,000 --> 00:01:48,000
+00:01:47,799 --> 00:01:52,739
 A&E waits are live,
 straight from the Hospital Authority.
 
 8
-00:01:50,000 --> 00:02:04,000
+00:02:01,299 --> 00:02:05,639
 Triage levels and fees, stated plainly —
 never guessed.
 
 9
-00:02:09,000 --> 00:02:24,000
+00:02:15,564 --> 00:02:20,664
 The hard part of a cha chaan teng isn't the food.
 It's what the waiter writes.
 
 10
-00:02:26,000 --> 00:02:40,000
-「0T 走冰 走甜」 — the shorthand
+00:02:28,564 --> 00:02:33,764
+「0T 走冰 少甜」 — the shorthand
 the kitchen reads, not a translation.
 
 11
-00:02:42,000 --> 00:02:51,000
-Just hold up the phone.
-
-12
-00:02:54,000 --> 00:03:09,000
+00:02:44,397 --> 00:02:47,777
 Photograph the menu
 and order straight off it.
 
-13
-00:03:12,000 --> 00:03:29,000
+12
+00:02:54,397 --> 00:02:58,897
 Misread a line? Fix it. We never invent
 a price the camera couldn't read.
 
-14
-00:03:34,000 --> 00:03:46,000
+13
+00:03:09,416 --> 00:03:12,316
 Nine languages —
 not just Chinese and English.
 
-15
-00:03:47,000 --> 00:03:56,000
-Bahasa · Tagalog · Nepali · Urdu · Hindi · Thai
-
-# Nothing over the closing card from 3:57. It already sets the tagline, the
-# URL and the credits as type; a subtitle on top would only collide with them.
-# The Cantonese line still plays — it just is not captioned twice.

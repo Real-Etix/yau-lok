@@ -16,18 +16,18 @@ CLIPS=clips
 WORK=.build
 OUT=yau-lok-demo.mp4
 CREAM=0xEDE6DA   # letterbox colour, so padding reads as the app's paper
+# Height given over to captions. A phone recording fills the frame top to
+# bottom, so any subtitle burned over it covers part of the interface — the
+# one thing the video exists to show. The footage is inset above this band
+# instead, and nothing is ever obscured.
+BAND=200
 
-# name:seconds — the running order, and how long each clip is cut to.
-ORDER=(
-  "01-home:12"
-  "02-minibus:45"
-  "03-taxi:35"
-  "04-clinic:35"
-  "05-cct:45"
-  "06-scan:40"
-  "07-language:25"
-  "08-close:13"
-)
+# The running order. Clips play at their RECORDED length — trimming them to
+# planned lengths would silently cut the end off a short take, and the
+# narration is derived from these same durations by make-narration.mjs, so the
+# two cannot drift apart. Only the generated card has a fixed length.
+ORDER=(01-home 02-minibus 03-taxi 04-clinic 05-cct 06-scan 07-language 08-close)
+CARD_SECONDS=13
 
 command -v ffmpeg >/dev/null || { echo "ffmpeg not found: brew install ffmpeg"; exit 1; }
 rm -rf "$WORK"; mkdir -p "$WORK"
@@ -35,9 +35,7 @@ rm -rf "$WORK"; mkdir -p "$WORK"
 echo "==> normalising clips"
 LIST="$WORK/list.txt"; : > "$LIST"
 TOTAL=0
-for entry in "${ORDER[@]}"; do
-  name="${entry%%:*}"; secs="${entry##*:}"
-
+for name in "${ORDER[@]}"; do
   src=""
   for ext in mov mp4 m4v MOV MP4; do
     [ -f "$CLIPS/$name.$ext" ] && { src="$CLIPS/$name.$ext"; break; }
@@ -47,14 +45,14 @@ for entry in "${ORDER[@]}"; do
   # showing a QR would be the one non-app frame in the video and would look
   # it. A recorded 08-close still wins if you made one.
   if [ -z "$src" ] && [ "$name" = "08-close" ] && [ -f assets/close-card.png ]; then
-    ffmpeg -y -loglevel error -loop 1 -t "$secs" -i assets/close-card.png \
-      -f lavfi -t "$secs" -i anullsrc=channel_layout=stereo:sample_rate=48000 \
+    ffmpeg -y -loglevel error -loop 1 -t "$CARD_SECONDS" -i assets/close-card.png \
+      -f lavfi -t "$CARD_SECONDS" -i anullsrc=channel_layout=stereo:sample_rate=48000 \
       -vf "scale=1080:1920,fps=30,setsar=1" -map 0:v -map 1:a \
       -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p \
       -c:a aac -b:a 160k -ar 48000 "$WORK/$name.mp4"
     echo "file '$name.mp4'" >> "$LIST"
-    TOTAL=$((TOTAL + secs))
-    echo "    ok $name (${secs}s, from close-card.png)"
+    TOTAL=$(python3 -c "print($TOTAL + $CARD_SECONDS)")
+    echo "    ok $name (${CARD_SECONDS}s, from close-card.png)"
     continue
   fi
 
@@ -63,17 +61,16 @@ for entry in "${ORDER[@]}"; do
     continue
   fi
 
-  have=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$src" | cut -d. -f1)
-  [ "${have:-0}" -lt "$secs" ] && echo "    ~  $name is ${have}s, wanted ${secs}s — using what's there"
+  secs=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$src")
 
   # Scale to fit 1080x1920 without distorting, pad the rest, force 30fps and
   # a silent stereo track when the recording has none.
   ffmpeg -y -loglevel error \
-    -t "$secs" -i "$src" \
+    -i "$src" \
     -f lavfi -t "$secs" -i anullsrc=channel_layout=stereo:sample_rate=48000 \
     -filter_complex "
-      [0:v]scale=1080:1920:force_original_aspect_ratio=decrease,
-           pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=$CREAM,
+      [0:v]scale=1080:$((1920-BAND)):force_original_aspect_ratio=decrease,
+           pad=1080:1920:(ow-iw)/2:0:color=$CREAM,
            fps=30,setsar=1[v];
       [0:a][1:a]amerge=inputs=2,pan=stereo|c0<c0+c2|c1<c1+c3[a]
     " -map "[v]" -map "[a]" \
@@ -81,15 +78,15 @@ for entry in "${ORDER[@]}"; do
     -c:a aac -b:a 160k -ar 48000 -shortest \
     "$WORK/$name.mp4" 2>/dev/null \
   || ffmpeg -y -loglevel error \
-    -t "$secs" -i "$src" -f lavfi -t "$secs" -i anullsrc=channel_layout=stereo:sample_rate=48000 \
-    -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=$CREAM,fps=30,setsar=1[v]" \
+    -i "$src" -f lavfi -t "$secs" -i anullsrc=channel_layout=stereo:sample_rate=48000 \
+    -filter_complex "[0:v]scale=1080:$((1920-BAND)):force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:0:color=$CREAM,fps=30,setsar=1[v]" \
     -map "[v]" -map 1:a \
     -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -c:a aac -b:a 160k -ar 48000 \
     "$WORK/$name.mp4"
 
   echo "file '$name.mp4'" >> "$LIST"
-  TOTAL=$((TOTAL + secs))
-  echo "    ok $name (${secs}s)"
+  TOTAL=$(python3 -c "print(round($TOTAL + $secs, 1))")
+  echo "    ok $name ($(python3 -c "print(f'{$secs:.1f}')")s)"
 done
 
 [ -s "$LIST" ] || { echo "no clips found in $CLIPS/ — nothing to build"; exit 1; }
@@ -108,7 +105,7 @@ echo "==> subtitles + narration"
 # FontSize and MarginV are in libass script units, not pixels: with no PlayResY
 # in the .srt the reference height is 288, so everything here is multiplied by
 # 1920/288 ≈ 6.7 on the way out. 8 → ~53px of type, 45 → ~300px off the bottom.
-SUBS="subtitles=narration.srt:force_style='FontName=Heiti TC,FontSize=8,PrimaryColour=&H00FFFFFF,OutlineColour=&HB4000000,BorderStyle=3,Outline=1,Shadow=0,MarginV=45,Alignment=2'"
+SUBS="subtitles=narration.srt:force_style='FontName=Heiti TC,FontSize=8,PrimaryColour=&H00FFFFFF,OutlineColour=&HB4000000,BorderStyle=3,Outline=1,Shadow=0,MarginV=12,Alignment=2'"
 
 if [ -n "$NARR" ]; then
   echo "    narration: $NARR"
