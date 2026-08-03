@@ -1,65 +1,78 @@
 1
-00:00:01,000 --> 00:00:05,680
+00:00:01,000 --> 00:00:05,640
+喺香港，難嘅唔係聽，係開口。
 In Hong Kong the problem isn't understanding Cantonese —
 it's having to speak it.
 
 2
-00:00:14,523 --> 00:00:19,143
+00:00:14,523 --> 00:00:18,983
+綠色小巴冇按鈴，唔嗌就過咗站。
 A green minibus has no bell.
 You shout 「有落」 — or you miss your stop.
 
 3
-00:00:33,023 --> 00:00:36,403
+00:00:33,023 --> 00:00:36,363
+有落知道你去邊，夠鐘幫你嗌。
 Yau Lok knows where you're going,
 and says it out loud for you.
 
 4
-00:00:57,023 --> 00:01:01,723
+00:00:57,023 --> 00:01:01,403
+落車提示同到站時間，全部實時。
 Stop alerts and live arrivals,
 from the government's own minibus feed.
 
 5
-00:01:23,529 --> 00:01:28,409
+00:01:23,529 --> 00:01:28,949
+上車前就知幾錢，講清楚目的地。
 Know the fare before you get in —
 and say the destination clearly.
 
 6
-00:01:35,029 --> 00:01:38,409
+00:01:35,029 --> 00:01:38,529
+真實香港咪錶，唔使淨係信個數。
 A real Hong Kong meter, so nobody
 has to take the number on trust.
 
 7
-00:01:47,799 --> 00:01:52,739
+00:01:47,799 --> 00:01:52,879
+急症室輪候時間，直接嚟自醫管局。
 A&E waits are live,
 straight from the Hospital Authority.
 
 8
-00:02:01,299 --> 00:02:05,639
+00:02:01,299 --> 00:02:05,939
+分流同收費寫得清楚，唔會靠估。
 Triage levels and fees, stated plainly —
 never guessed.
 
 9
-00:02:15,564 --> 00:02:20,664
+00:02:15,564 --> 00:02:19,744
+茶餐廳最難嘅，係伙記寫嗰啲字。
 The hard part of a cha chaan teng isn't the food.
 It's what the waiter writes.
 
 10
-00:02:28,564 --> 00:02:33,764
+00:02:28,564 --> 00:02:34,084
+「0T 走冰 少甜」——廚房睇得明嘅寫法。
 「0T 走冰 少甜」 — the shorthand
 the kitchen reads, not a translation.
 
 11
-00:02:44,397 --> 00:02:47,777
+00:02:44,397 --> 00:02:47,617
+影低塊餐牌，就可以直接落單。
 Photograph the menu
 and order straight off it.
 
 12
-00:02:54,397 --> 00:02:58,897
+00:02:54,397 --> 00:02:58,977
+認錯咗？改得。價錢唔會靠估。
 Misread a line? Fix it. We never invent
 a price the camera couldn't read.
 
 13
-00:03:09,416 --> 00:03:12,316
+00:03:09,416 --> 00:03:12,596
+九種語言，唔止中英文。
 Nine languages —
 not just Chinese and English.
 

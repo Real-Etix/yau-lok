@@ -20,7 +20,14 @@ CREAM=0xEDE6DA   # letterbox colour, so padding reads as the app's paper
 # bottom, so any subtitle burned over it covers part of the interface — the
 # one thing the video exists to show. The footage is inset above this band
 # instead, and nothing is ever obscured.
-BAND=200
+BAND=280
+# Target loudness for the two tracks, in LUFS. The app's clips arrive wildly
+# uneven — 01 and 07 are digital silence, the rest peak near 0dB with a very
+# low mean because the app's voice is short bursts against nothing — so fixed
+# multipliers cannot balance them. Normalising both to a stated target can.
+# Raise APP_LUFS toward NARR_LUFS to hear more of the app; they are 1 LU apart.
+APP_LUFS=-18
+NARR_LUFS=-17
 
 # The running order. Clips play at their RECORDED length — trimming them to
 # planned lengths would silently cut the end off a short take, and the
@@ -105,12 +112,24 @@ echo "==> subtitles + narration"
 # FontSize and MarginV are in libass script units, not pixels: with no PlayResY
 # in the .srt the reference height is 288, so everything here is multiplied by
 # 1920/288 ≈ 6.7 on the way out. 8 → ~53px of type, 45 → ~300px off the bottom.
-SUBS="subtitles=narration.srt:force_style='FontName=Heiti TC,FontSize=8,PrimaryColour=&H00FFFFFF,OutlineColour=&HB4000000,BorderStyle=3,Outline=1,Shadow=0,MarginV=12,Alignment=2'"
+SUBS="subtitles=narration.srt:force_style='FontName=Heiti TC,FontSize=7,PrimaryColour=&H00FFFFFF,OutlineColour=&HB4000000,BorderStyle=3,Outline=1,Shadow=0,MarginV=10,Alignment=2'"
 
 if [ -n "$NARR" ]; then
   echo "    narration: $NARR"
+  # The app's own voice is the product; it is not background music. So instead
+  # of holding it down for the whole video, it plays at full level and is
+  # ducked only while a narration line is actually speaking — sidechained off
+  # the narration itself. alimiter catches the sum so the two together cannot
+  # clip.
   ffmpeg -y -loglevel error -i "$WORK/joined.mp4" -i "$NARR" \
-    -filter_complex "[0:v]$SUBS[v];[0:a]volume=0.75[a0];[1:a]volume=1.5[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[a]" \
+    -filter_complex "
+      [0:v]$SUBS[v];
+      [0:a]loudnorm=I=$APP_LUFS:TP=-1.5:LRA=11[app];
+      [1:a]loudnorm=I=$NARR_LUFS:TP=-1.5:LRA=7,asplit=2[key][nar];
+      [app][key]sidechaincompress=threshold=0.05:ratio=4:attack=20:release=400[ducked];
+      [ducked][nar]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,
+        alimiter=limit=0.95[a]
+    " \
     -map "[v]" -map "[a]" \
     -c:v libx264 -preset slow -crf 21 -pix_fmt yuv420p -movflags +faststart \
     -c:a aac -b:a 192k "$OUT"
