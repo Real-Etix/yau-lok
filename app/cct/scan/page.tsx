@@ -54,6 +54,7 @@ function ScanFlow() {
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const libraryRef = useRef<HTMLInputElement>(null);
 
   const go = useCallback(
     (next: Step) => router.push(`/cct/scan?step=${next}`),
@@ -215,7 +216,7 @@ function ScanFlow() {
 
           <div className="flex items-center justify-between px-4 pb-[max(1.6rem,env(safe-area-inset-bottom))] pt-[18px]">
             <button
-              onClick={() => fileRef.current?.click()}
+              onClick={() => libraryRef.current?.click()}
               className="flex size-[52px] flex-col items-center justify-center gap-[3px] rounded-[14px]"
               style={{ border: "1px solid #333" }}
             >
@@ -225,9 +226,10 @@ function ScanFlow() {
               </span>
             </button>
 
-            {/* Live capture and the roll go through the same input: `capture`
-                asks for the camera, and a device without one falls back to
-                the picker on its own. */}
+            {/* The shutter and the roll need separate inputs. `capture` is not
+                a hint a phone can decline — with it set, iOS and Android open
+                the camera no matter which control was tapped, so the library
+                button needs an input that does not carry it. */}
             <button
               onClick={() => fileRef.current?.click()}
               aria-label={t("scan.shutter")}
@@ -258,6 +260,16 @@ function ScanFlow() {
             type="file"
             accept="image/*"
             capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) takePhoto(f);
+            }}
+          />
+          <input
+            ref={libraryRef}
+            type="file"
+            accept="image/*"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];

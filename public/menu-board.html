@@ -1,0 +1,131 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>餐牌 — 金鳳茶餐廳</title>
+<!--
+  A 餐牌 to photograph, for when there is no real one to hand.
+
+  Built to be READ BY A CAMERA, not to be pretty: flat cream, near-black type,
+  no gradients or textures behind the characters, generous leading, and prices
+  in their own column so a line break never separates a dish from its number.
+  Heiti/PingFang rather than a display face — Tesseract does badly on stylised
+  Chinese, and a menu it cannot read proves nothing.
+
+  Print it if you can: paper photographs far better than a screen, with no
+  glow and no moiré. Otherwise open it full screen, turn the brightness up,
+  and shoot slightly off-axis to keep your own reflection out of it.
+-->
+<style>
+  @page { size: A4 portrait; margin: 10mm; }
+  :root {
+    --ink: #14100c;
+    --red: #b3151b;
+    --paper: #f7f1e4;
+    --rule: #cdc2ad;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #6b6157; }
+  body {
+    font-family: "PingFang HK", "Heiti TC", "Hiragino Sans GB", sans-serif;
+    display: flex; justify-content: center; padding: 24px 12px;
+  }
+  .board {
+    width: min(760px, 100%);
+    background: var(--paper);
+    color: var(--ink);
+    padding: 42px 46px 34px;
+    box-shadow: 0 18px 50px rgba(0,0,0,.45);
+  }
+
+  header { text-align: center; border-bottom: 3px solid var(--ink); padding-bottom: 14px; }
+  .shop { font-size: 44px; font-weight: 900; letter-spacing: .08em; }
+  .shop-en {
+    margin-top: 6px; font-size: 13px; font-weight: 700;
+    letter-spacing: .3em; color: #6d6355;
+  }
+
+  .setmeal {
+    margin: 22px 0 26px; border: 3px solid var(--red); padding: 16px 20px 18px;
+  }
+  .setmeal h2 {
+    font-size: 30px; font-weight: 900; color: var(--red);
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .setmeal ul { list-style: none; margin-top: 10px; }
+  .setmeal li { font-size: 21px; font-weight: 700; line-height: 1.75; }
+
+  h3 {
+    margin: 26px 0 8px; font-size: 25px; font-weight: 900;
+    border-bottom: 2px solid var(--rule); padding-bottom: 6px;
+  }
+  h3 small { font-size: 13px; font-weight: 700; color: #7d7365; letter-spacing: .18em; }
+
+  table { width: 100%; border-collapse: collapse; }
+  td { font-size: 22px; font-weight: 700; line-height: 2.0; vertical-align: baseline; }
+  td.price {
+    text-align: right; width: 96px; font-size: 23px; font-weight: 900;
+    color: var(--red); font-variant-numeric: tabular-nums;
+  }
+
+  footer {
+    margin-top: 26px; border-top: 2px solid var(--rule); padding-top: 12px;
+    font-size: 17px; font-weight: 700; line-height: 1.9; color: #5c5348;
+  }
+</style>
+
+<div class="board">
+  <header>
+    <div class="shop">金鳳茶餐廳</div>
+    <div class="shop-en">KAM FUNG CAFE</div>
+  </header>
+
+  <section class="setmeal">
+    <h2><span>常餐</span><span>$52</span></h2>
+    <ul>
+      <li>餐蛋公仔麵 · 西多士 · 熱飲</li>
+      <li>火腿奄列 · 豬扒飯 · 例湯</li>
+    </ul>
+  </section>
+
+  <h3>碟頭飯 <small>RICE</small></h3>
+  <table>
+    <tr><td>乾炒牛河</td><td class="price">$62</td></tr>
+    <tr><td>焗豬扒飯</td><td class="price">$68</td></tr>
+    <tr><td>瑞士雞翼飯</td><td class="price">$64</td></tr>
+    <tr><td>豉椒排骨飯</td><td class="price">$60</td></tr>
+    <tr><td>揚州炒飯</td><td class="price">$58</td></tr>
+  </table>
+
+  <h3>粉麵 <small>NOODLES</small></h3>
+  <table>
+    <tr><td>沙嗲牛肉麵</td><td class="price">$48</td></tr>
+    <tr><td>雲吞麵</td><td class="price">$46</td></tr>
+    <tr><td>撈丁</td><td class="price">$46</td></tr>
+    <tr><td>餐蛋麵</td><td class="price">$44</td></tr>
+    <tr><td>火腿通粉</td><td class="price">$40</td></tr>
+  </table>
+
+  <h3>多士 · 三文治 <small>TOAST</small></h3>
+  <table>
+    <tr><td>西多士</td><td class="price">$30</td></tr>
+    <tr><td>腿蛋治</td><td class="price">$32</td></tr>
+    <tr><td>蛋治</td><td class="price">$28</td></tr>
+    <tr><td>菠蘿油</td><td class="price">$26</td></tr>
+    <tr><td>奶油豬仔包</td><td class="price">$24</td></tr>
+  </table>
+
+  <h3>飲品 <small>DRINKS</small></h3>
+  <table>
+    <tr><td>凍檸茶</td><td class="price">$27</td></tr>
+    <tr><td>好立克</td><td class="price">$28</td></tr>
+    <tr><td>阿華田</td><td class="price">$28</td></tr>
+    <tr><td>鴛鴦</td><td class="price">$26</td></tr>
+    <tr><td>奶茶</td><td class="price">$24</td></tr>
+    <tr><td>咖啡</td><td class="price">$24</td></tr>
+    <tr><td>滾水蛋</td><td class="price">$16</td></tr>
+  </table>
+
+  <footer>
+    凍飲加 $5 · 加底 $6 · 茶芥每位 $2<br>
+    價目已包括加一服務費
+  </footer>
+</div>
