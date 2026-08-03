@@ -27,6 +27,8 @@ import { Screen, TopBar, PressButton, LanguageRow } from "@/components/ui";
 import { Volume2, Pencil, BookOpen, Camera } from "lucide-react";
 import Link from "next/link";
 import { useT } from "@/lib/i18n";
+import { useStored } from "@/lib/prefs";
+import type { LastChit } from "@/lib/home-numbers";
 
 const TABLE_NUMBER = 12;
 
@@ -42,6 +44,7 @@ export default function CctPage() {
   );
   const [picked, setPicked] = useState<string[]>([]);
   const [tweaks, setTweaks] = useState<string[]>([]);
+  const [, setLastChit] = useStored<LastChit | null>("yau-lok-last-chit", null);
 
   useEffect(() => {
     const v = localStorage.getItem("yau-lok-voice");
@@ -92,6 +95,18 @@ export default function CctPage() {
       gloss: t(`cct.tweak.${k}`),
     })),
   ];
+
+  // Handing the chit over is what makes it the last order, so the home screen
+  // learns about it at 埋單 rather than the moment the chit is drawn — an order
+  // abandoned halfway is not something to greet you with tomorrow.
+  const rememberChit = useCallback(() => {
+    if (!chitItems.length) return;
+    setLastChit({
+      firstLine: chitItems[0].label,
+      total,
+      at: Date.now(),
+    });
+  }, [chitItems, total, setLastChit]);
 
   const orderPhrase = CCT_PHRASES.find((p) => p.id === "order-please")!;
   const payPhrases = CCT_PHRASES.filter((p) => p.group === "pay");
@@ -472,7 +487,10 @@ export default function CctPage() {
             <PressButton
               tone="cct"
               className="rounded-[12px]"
-              onClick={() => setStep("pay")}
+              onClick={() => {
+                rememberChit();
+                setStep("pay");
+              }}
             >
               {t("cct.payTitle")}
             </PressButton>

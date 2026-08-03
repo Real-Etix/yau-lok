@@ -33,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import { useT, useLanguage } from "@/lib/i18n";
+import { useStored } from "@/lib/prefs";
 
 type Plan = {
   distanceM: number;
@@ -67,6 +68,10 @@ export default function TaxiPage() {
   const [originQuery, setOriginQuery] = useState("");
   const [destQuery, setDestQuery] = useState("");
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [, setLastTaxi] = useStored<{ to: string; distanceM: number } | null>(
+    "yau-lok-last-taxi",
+    null,
+  );
   const [planning, setPlanning] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
 
@@ -118,6 +123,17 @@ export default function TaxiPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "could not plan");
       setPlan(data);
+      // Remember where this trip was headed, so the home screen can lead with
+      // an estimate to the place you actually go instead of the bare flagfall.
+      // Planning rather than arriving is the signal: someone who looked up a
+      // fare to Kwun Tong wants that number again tomorrow whether or not
+      // they got in the cab.
+      if (typeof data.distanceM === "number") {
+        setLastTaxi({
+          to: data.destinationChinese ?? data.destinationInput ?? destQuery.trim(),
+          distanceM: data.distanceM,
+        });
+      }
     } catch (e) {
       setPlanError(e instanceof Error ? e.message : t("taxi.planError"));
     } finally {

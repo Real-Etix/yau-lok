@@ -30,7 +30,8 @@ import {
   type RecognisedItem,
 } from "@/lib/toolhub";
 import { putMenuPhoto, getMenuPhoto, deleteMenuPhoto } from "@/lib/menu-photo";
-import { useScanDraft, type OrderLine } from "@/lib/prefs";
+import { useScanDraft, useStored, type OrderLine } from "@/lib/prefs";
+import type { LastChit } from "@/lib/home-numbers";
 import { speakCantonese } from "@/lib/speech";
 import { useT } from "@/lib/i18n";
 
@@ -46,6 +47,7 @@ function ScanFlow() {
   const step = (params.get("step") as Step) ?? "shoot";
 
   const { draft, setDraft } = useScanDraft();
+  const [, setLastChit] = useStored<LastChit | null>("yau-lok-last-chit", null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -625,7 +627,18 @@ function ScanFlow() {
 
         <div className="sticky bottom-0 px-4 pb-[max(1.6rem,env(safe-area-inset-bottom))] pt-3">
           <button
-            onClick={() => speakCantonese("唔該，落單！")}
+            onClick={() => {
+              // Showing the waiter is the moment the order becomes real, so
+              // that is when the home screen is told about it.
+              if (draft.order.length) {
+                setLastChit({
+                  firstLine: chitLabel(draft.order[0]),
+                  total: orderTotal,
+                  at: Date.now(),
+                });
+              }
+              speakCantonese("唔該，落單！");
+            }}
             className="press flex min-h-[56px] w-full items-center justify-center gap-2.5 rounded-[14px] text-[17px] font-black"
             style={{ background: "var(--melamine)", color: "var(--ink)" }}
           >
