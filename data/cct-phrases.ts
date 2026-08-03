@@ -166,6 +166,40 @@ export function cctTweak(id: string): CctTweak | undefined {
   return CCT_TWEAK_LIST.find((t) => t.id === id);
 }
 
+/**
+ * Is this line off the 餐牌 a drink?
+ *
+ * 凍 or 熱 is a question about a drink and nonsense about a plate of 乾炒牛河,
+ * so the order screen has to know which it is holding. The text comes off a
+ * photograph, so there is no id to look up: the board is checked first, and
+ * anything it does not know falls back to the characters that only ever
+ * appear in a drink's name.
+ *
+ * Deliberately conservative. Guessing "food" for an unknown drink costs the
+ * user one question they were not asked; guessing "drink" for a plate of rice
+ * puts a question on screen that makes the app look like it cannot read.
+ */
+const DRINK_HINTS = [
+  "茶", "啡", "鴦", "檸", "咖", "可樂", "汽水", "豆漿", "果汁",
+  "立克", "華田", "菜蜜", "滾水", "奶昔", "冰",
+];
+
+export function looksLikeDrink(zh: string): boolean {
+  const text = zh.trim();
+  if (!text) return false;
+
+  // The board wins: 奶油豬 has 奶 in it and is a bun, and CCT_MENU knows that.
+  const known = CCT_MENU.find(
+    (m) =>
+      text.includes(m.chit) ||
+      (text.length >= 2 && m.chit.includes(text)) ||
+      text === m.token,
+  );
+  if (known) return known.kind === "drink";
+
+  return DRINK_HINTS.some((h) => text.includes(h));
+}
+
 /** The house rules a first-timer gets wrong. */
 export const CCT_RULES = ["pay-at-till", "no-tip", "leave-when-busy"] as const;
 

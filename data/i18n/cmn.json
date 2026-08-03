@@ -577,5 +577,6 @@
   "home.hereAndNow": "{place} · {temp}° {sky}",
   "home.feeLine": "分流I·II免费 · {levels} ${fee}",
   "home.lastOrder": "最后订单",
-  "home.noOrderYet": "暂无"
+  "home.noOrderYet": "暂无",
+  "scan.startOver": "清空重来"
 }

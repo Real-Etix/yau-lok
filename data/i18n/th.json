@@ -577,5 +577,6 @@
   "home.hereAndNow": "{place} · {temp}° {sky}",
   "home.feeLine": "คัดกรอง I·II ฟรี · {levels} ${fee}",
   "home.lastOrder": "ออเดอร์สุดท้าย",
-  "home.noOrderYet": "ยังไม่มี"
+  "home.noOrderYet": "ยังไม่มี",
+  "scan.startOver": "เริ่มใหม่"
 }

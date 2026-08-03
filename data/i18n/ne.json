@@ -577,5 +577,6 @@
   "home.hereAndNow": "{place} · {temp}° {sky}",
   "home.feeLine": "ट्राइज I·II फ्री · {levels} ${fee}",
   "home.lastOrder": "अन्तिम अर्डर",
-  "home.noOrderYet": "अहिलेसम्म छैन"
+  "home.noOrderYet": "अहिलेसम्म छैन",
+  "scan.startOver": "फेरि सुरु गर्नुहोस्"
 }

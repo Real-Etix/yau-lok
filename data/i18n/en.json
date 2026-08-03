@@ -577,5 +577,6 @@
   "home.hereAndNow": "{place} · {temp}° {sky}",
   "home.feeLine": "Triage I·II free · {levels} ${fee}",
   "home.lastOrder": "LAST ORDER",
-  "home.noOrderYet": "NOT YET"
+  "home.noOrderYet": "NOT YET",
+  "scan.startOver": "Start over"
 }

@@ -23,7 +23,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Images, Flashlight, Search, Eye, Plus, Pencil } from "lucide-react";
 import OrderChit from "@/components/OrderChit";
 import { Screen, TopBar, PressButton, Segmented } from "@/components/ui";
-import { CCT_TWEAK_LIST, cctTweak, type CctTweak } from "@/data/cct-phrases";
+import {
+  CCT_TWEAK_LIST,
+  cctTweak,
+  looksLikeDrink,
+  type CctTweak,
+} from "@/data/cct-phrases";
 import {
   recogniseMenu,
   OCR_CONFIDENCE_FLOOR,
@@ -46,7 +51,7 @@ function ScanFlow() {
   const params = useSearchParams();
   const step = (params.get("step") as Step) ?? "shoot";
 
-  const { draft, setDraft } = useScanDraft();
+  const { draft, setDraft, clearDraft } = useScanDraft();
   const [, setLastChit] = useStored<LastChit | null>("yau-lok-last-chit", null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -85,7 +90,10 @@ function ScanFlow() {
         const photoId = await putMenuPhoto(file);
         const items = await recogniseMenu(file);
         const good = items.filter((i) => i.confidence >= OCR_CONFIDENCE_FLOOR);
-        setDraft({ ...draft, photoId, items });
+        // A new photo is a new order. Carrying `order` across meant lines from
+        // the last board silently piled onto the next one, and nothing in the
+        // UI could clear them.
+        setDraft({ photoId, items, order: [], editingId: null });
         if (good.length === 0) setFailed(true);
         go("read");
       } catch {
@@ -489,6 +497,23 @@ function ScanFlow() {
             </button>
           )}
 
+          {/* A draft survives a reload on purpose — a busy 茶餐廳 is no place
+              to lose an order to a locked screen. That makes an explicit way
+              out of it necessary, not optional. */}
+          {draft.order.length > 0 && (
+            <button
+              onClick={() => {
+                if (draft.photoId) deleteMenuPhoto(draft.photoId);
+                clearDraft();
+                go("shoot");
+              }}
+              className="min-h-11 text-center text-[12px] font-bold"
+              style={{ color: "var(--sign-red)" }}
+            >
+              {t("scan.startOver")}
+            </button>
+          )}
+
           {/* Manual is always one tap away, not only after a failure. */}
           {!failed && (
             <button
@@ -608,16 +633,23 @@ function ScanFlow() {
             <p className="text-[11px] font-extrabold uppercase tracking-[0.14em]">
               {t("scan.theyMayAsk")}
             </p>
-            <AskBack
-              question={t("scan.qColdHot")}
-              options={[t("scan.cold"), t("scan.hot")]}
-              onPick={(i) =>
-                setDraft({
-                  ...draft,
-                  order: draft.order.map((l) => ({ ...l, hot: i === 1 })),
-                })
-              }
-            />
+            {/* Only a waiter taking a drinks order asks this, and it must
+                only change the drinks — 熱 on a plate of rice is not a thing
+                anyone has ever been asked. */}
+            {draft.order.some((l) => looksLikeDrink(l.zh)) && (
+              <AskBack
+                question={t("scan.qColdHot")}
+                options={[t("scan.cold"), t("scan.hot")]}
+                onPick={(i) =>
+                  setDraft({
+                    ...draft,
+                    order: draft.order.map((l) =>
+                      looksLikeDrink(l.zh) ? { ...l, hot: i === 1 } : l,
+                    ),
+                  })
+                }
+              />
+            )}
             <AskBack
               question={t("scan.qEatIn")}
               options={[t("scan.eatIn"), t("cct.tweak.haang-gaai")]}
@@ -723,12 +755,17 @@ function ItemStep({
   const toggle = (id: string) =>
     setTweaks((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
+  // Read off the editable name, not the raw OCR: correcting a misread line
+  // should also correct which questions the screen asks about it.
+  const isDrink = looksLikeDrink(zh);
+
   const base = Number(price) || 0;
   const surcharges = tweaks.reduce(
     (sum, id) => sum + (cctTweak(id)?.surchargeHkd ?? 0),
     0,
   );
-  const total = base + surcharges + (hot ? 0 : base ? COLD_SURCHARGE : 0);
+  const total =
+    base + surcharges + (isDrink && !hot && base ? COLD_SURCHARGE : 0);
 
   const chitParts = tweaks
     .map((id) => (id === "custom" ? custom : (cctTweak(id)?.chit ?? "")))
@@ -798,19 +835,25 @@ function ItemStep({
           </label>
         )}
 
-        {sectionLabel(t("scan.coldOrHot"))}
-        <Segmented
-          full
-          value={hot ? "hot" : "cold"}
-          onChange={(v) => setHot(v === "hot")}
-          options={[
-            { value: "cold", label: `${t("scan.cold")} ＋$${COLD_SURCHARGE}` },
-            { value: "hot", label: t("scan.hot") },
-          ]}
-        />
+        {/* 凍 or 熱 is a question about a drink and nonsense about a plate of
+            rice, so it is only asked when the line is one. */}
+        {isDrink && (
+          <>
+            {sectionLabel(t("scan.coldOrHot"))}
+            <Segmented
+              full
+              value={hot ? "hot" : "cold"}
+              onChange={(v) => setHot(v === "hot")}
+              options={[
+                { value: "cold", label: `${t("scan.cold")} ＋$${COLD_SURCHARGE}` },
+                { value: "hot", label: t("scan.hot") },
+              ]}
+            />
+          </>
+        )}
 
-        {sectionLabel(t("scan.howTitle"))}
-        <div className="grid grid-cols-2 gap-2">
+        {isDrink && sectionLabel(t("scan.howTitle"))}
+        <div className={isDrink ? "grid grid-cols-2 gap-2" : "hidden"}>
           {group("drink").map((tw) => {
             const on = tweaks.includes(tw.id);
             return (
@@ -833,8 +876,16 @@ function ItemStep({
           })}
         </div>
 
-        {sectionLabel(t("scan.withSet"))}
-        <ChipRow ids={group("set").map((x) => x.id)} tweaks={tweaks} onToggle={toggle} />
+        {!isDrink && (
+          <>
+            {sectionLabel(t("scan.withSet"))}
+            <ChipRow
+              ids={group("set").map((x) => x.id)}
+              tweaks={tweaks}
+              onToggle={toggle}
+            />
+          </>
+        )}
 
         {sectionLabel(t("scan.anythingElse"))}
         <ChipRow
