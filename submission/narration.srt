@@ -1,0 +1,81 @@
+1
+00:00:00,400 --> 00:00:11,500
+In Hong Kong the problem isn't understanding Cantonese —
+it's having to speak it.
+
+2
+00:00:14,000 --> 00:00:28,000
+A green minibus has no bell.
+You shout 「有落」 — or you miss your stop.
+
+3
+00:00:30,000 --> 00:00:42,000
+Yau Lok knows where you're going,
+and says it out loud for you.
+
+4
+00:00:44,000 --> 00:00:55,000
+Live arrivals and stop alerts,
+from the government's own minibus feed.
+
+5
+00:00:59,000 --> 00:01:12,000
+Know the fare before you get in —
+and say the destination clearly.
+
+6
+00:01:14,000 --> 00:01:29,000
+A real Hong Kong meter, so nobody
+has to take the number on trust.
+
+7
+00:01:34,000 --> 00:01:48,000
+A&E waits are live,
+straight from the Hospital Authority.
+
+8
+00:01:50,000 --> 00:02:04,000
+Triage levels and fees, stated plainly —
+never guessed.
+
+9
+00:02:09,000 --> 00:02:24,000
+The hard part of a cha chaan teng isn't the food.
+It's what the waiter writes.
+
+10
+00:02:26,000 --> 00:02:40,000
+「0T 走冰 走甜」 — the shorthand
+the kitchen reads, not a translation.
+
+11
+00:02:42,000 --> 00:02:51,000
+Just hold up the phone.
+
+12
+00:02:54,000 --> 00:03:09,000
+Photograph the menu
+and order straight off it.
+
+13
+00:03:12,000 --> 00:03:29,000
+Misread a line? Fix it. We never invent
+a price the camera couldn't read.
+
+14
+00:03:34,000 --> 00:03:46,000
+Nine languages —
+not just Chinese and English.
+
+15
+00:03:47,000 --> 00:03:56,000
+Bahasa · Tagalog · Nepali · Urdu · Hindi · Thai
+
+16
+00:03:59,000 --> 00:04:06,000
+有落 — don't worry, I'll say it for you.
+
+17
+00:04:06,500 --> 00:04:10,000
+yau-lok.vercel.app
+Cantonese narration by HKGAI text-to-speech

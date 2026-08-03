@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# Build the demo video from the 8 screen recordings.
+#
+# Every clip is normalised to the same codec, size, frame rate and audio
+# layout first — concat only works on streams that already match, and a clip
+# recorded with no audio track will otherwise desync everything after it.
+#
+#   bash submission/assemble.sh
+#
+# Output: submission/yau-lok-demo.mp4
+
+set -euo pipefail
+cd "$(dirname "$0")"
+
+CLIPS=clips
+WORK=.build
+OUT=yau-lok-demo.mp4
+CREAM=0xEDE6DA   # letterbox colour, so padding reads as the app's paper
+
+# name:seconds — the running order, and how long each clip is cut to.
+ORDER=(
+  "01-home:12"
+  "02-minibus:45"
+  "03-taxi:35"
+  "04-clinic:35"
+  "05-cct:45"
+  "06-scan:40"
+  "07-language:25"
+  "08-close:13"
+)
+
+command -v ffmpeg >/dev/null || { echo "ffmpeg not found: brew install ffmpeg"; exit 1; }
+rm -rf "$WORK"; mkdir -p "$WORK"
+
+echo "==> normalising clips"
+LIST="$WORK/list.txt"; : > "$LIST"
+TOTAL=0
+for entry in "${ORDER[@]}"; do
+  name="${entry%%:*}"; secs="${entry##*:}"
+
+  src=""
+  for ext in mov mp4 m4v MOV MP4; do
+    [ -f "$CLIPS/$name.$ext" ] && { src="$CLIPS/$name.$ext"; break; }
+  done
+  if [ -z "$src" ]; then
+    echo "    !! missing $CLIPS/$name.(mov|mp4) — skipping"
+    continue
+  fi
+
+  have=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$src" | cut -d. -f1)
+  [ "${have:-0}" -lt "$secs" ] && echo "    ~  $name is ${have}s, wanted ${secs}s — using what's there"
+
+  # Scale to fit 1080x1920 without distorting, pad the rest, force 30fps and
+  # a silent stereo track when the recording has none.
+  ffmpeg -y -loglevel error \
+    -t "$secs" -i "$src" \
+    -f lavfi -t "$secs" -i anullsrc=channel_layout=stereo:sample_rate=48000 \
+    -filter_complex "
+      [0:v]scale=1080:1920:force_original_aspect_ratio=decrease,
+           pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=$CREAM,
+           fps=30,setsar=1[v];
+      [0:a][1:a]amerge=inputs=2,pan=stereo|c0<c0+c2|c1<c1+c3[a]
+    " -map "[v]" -map "[a]" \
+    -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p \
+    -c:a aac -b:a 160k -ar 48000 -shortest \
+    "$WORK/$name.mp4" 2>/dev/null \
+  || ffmpeg -y -loglevel error \
+    -t "$secs" -i "$src" -f lavfi -t "$secs" -i anullsrc=channel_layout=stereo:sample_rate=48000 \
+    -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=$CREAM,fps=30,setsar=1[v]" \
+    -map "[v]" -map 1:a \
+    -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -c:a aac -b:a 160k -ar 48000 \
+    "$WORK/$name.mp4"
+
+  echo "file '$name.mp4'" >> "$LIST"
+  TOTAL=$((TOTAL + secs))
+  echo "    ok $name (${secs}s)"
+done
+
+[ -s "$LIST" ] || { echo "no clips found in $CLIPS/ — nothing to build"; exit 1; }
+
+echo "==> joining (${TOTAL}s)"
+ffmpeg -y -loglevel error -f concat -safe 0 -i "$LIST" -c copy "$WORK/joined.mp4"
+
+# Narration, if it exists: mixed *under* the app's own audio rather than over
+# it, so the Cantonese the app speaks in clips 02 and 05 stays audible.
+NARR=""
+for f in narration.wav narration.m4a narration.mp3; do [ -f "$f" ] && { NARR="$f"; break; }; done
+
+echo "==> subtitles + narration"
+# Heiti TC, not PingFang: fontconfig on macOS does not expose the PingFang
+# family to libass, and an unresolved family silently renders CJK as tofu.
+# FontSize and MarginV are in libass script units, not pixels: with no PlayResY
+# in the .srt the reference height is 288, so everything here is multiplied by
+# 1920/288 ≈ 6.7 on the way out. 8 → ~53px of type, 45 → ~300px off the bottom.
+SUBS="subtitles=narration.srt:force_style='FontName=Heiti TC,FontSize=8,PrimaryColour=&H00FFFFFF,OutlineColour=&HB4000000,BorderStyle=3,Outline=1,Shadow=0,MarginV=45,Alignment=2'"
+
+if [ -n "$NARR" ]; then
+  echo "    narration: $NARR"
+  ffmpeg -y -loglevel error -i "$WORK/joined.mp4" -i "$NARR" \
+    -filter_complex "[0:v]$SUBS[v];[0:a]volume=0.75[a0];[1:a]volume=1.5[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[a]" \
+    -map "[v]" -map "[a]" \
+    -c:v libx264 -preset slow -crf 21 -pix_fmt yuv420p -movflags +faststart \
+    -c:a aac -b:a 192k "$OUT"
+else
+  echo "    no narration file — building with app audio only"
+  ffmpeg -y -loglevel error -i "$WORK/joined.mp4" \
+    -vf "$SUBS" \
+    -c:v libx264 -preset slow -crf 21 -pix_fmt yuv420p -movflags +faststart \
+    -c:a aac -b:a 192k "$OUT"
+fi
+
+rm -rf "$WORK"
+echo
+echo "==> $OUT"
+ffprobe -v error -select_streams v:0 \
+  -show_entries stream=codec_name,width,height -show_entries format=duration,size \
+  -of default=noprint_wrappers=1 "$OUT" | sed 's/^/    /'
+echo
+echo "    want: h264 / 1080x1920 / duration 180-300 / size under 300000000"

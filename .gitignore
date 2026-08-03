@@ -42,3 +42,11 @@ next-env.d.ts
 
 # local editor/agent config
 .claude/
+
+# demo video working files
+submission/clips/*.mov
+submission/clips/*.mp4
+submission/narration.wav
+submission/yau-lok-demo.mp4
+submission/.build/
+submission/.narr/
